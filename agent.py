@@ -3,7 +3,7 @@ import uuid
 import os
 
 os.environ["LANGCHAIN_ENDPOINT"]="https://api.smith.langchain.com"
-os.environ["LANGCHAIN_TRACING_V2"] = "false"
+os.environ["LANGCHAIN_TRACING_V2"] = "true"
 
 from utils import ModelType
 
@@ -64,21 +64,20 @@ def initialize_agent(model: ModelType = ModelType.GPT):
     # The checkpointer lets the graph persist its state
     # this is a complete memory for the entire graph.
     memory = MemorySaver()
-    agent = builder.compile(checkpointer=memory)
-    return agent
+    return builder.compile(checkpointer=memory)
 
 
 if __name__ == "__main__":
-    assistant_graph = initialize_agent()
+    assistant_graph = initialize_agent(model=ModelType.LOCAL)
 
-    show_graph(assistant_graph)
+    #show_graph(assistant_graph)
     from langchain_core.messages import HumanMessage
 
     # Let's create an example conversation a user might have with the assistant
     tutorial_questions = [
-        "Где можно посмотреть задание?",
-        "В какое время проверяются задания?",
-        "Когда вебминар?"
+        "Кто такие кей юзеры?",
+        "Не работает МФУ",
+        "Как отресетить график?"
     ]
 
     thread_id = str(uuid.uuid4())
@@ -87,7 +86,7 @@ if __name__ == "__main__":
         "configurable": {
             # The passenger_id is used in our flight tools to
             # fetch the user's flight information
-            "user_id": "3442 587242",
+            "user_info": "3442 587242",
             # Checkpoints are accessed by thread_id
             "thread_id": thread_id,
         }

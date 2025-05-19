@@ -27,17 +27,19 @@ from langgraph.graph import START, END, StateGraph
 from langgraph.prebuilt import tools_condition
 
 from langchain_community.vectorstores import FAISS
+from palimpsest import Palimpsest
+
 import config
 
 def load_vectorstore(file_path: str, embedding_model_name: str) -> FAISS:
     if not os.path.exists(file_path):
         raise FileNotFoundError(f"No vectorstore found at {file_path}")
-    
+
     embeddings = HuggingFaceEmbeddings(model_name=embedding_model_name)
 
-    vectorstore = FAISS.load_local(file_path, embeddings, allow_dangerous_deserialization=True)
-
-    return vectorstore
+    return FAISS.load_local(
+        file_path, embeddings, allow_dangerous_deserialization=True
+    )
 
 
 def get_retriever_multi():
@@ -96,18 +98,29 @@ def get_retriever():
 
 search = get_retriever()
 
-
-@tool
-def search_kb(query: str) -> str:
-    """Retrieves context related to query from the knowledgebase. Shall be always used when user asks question."""
-    results = search(query)
-    #results = bm25_retriever.invoke(query)
-    if results:
-        return "\n\n".join([doc.page_content for doc in results[:30]])
-    else:
-        return "No matching information found."
+def get_search_tool(anonymizer: Palimpsest = None):
+    
+    @tool
+    def search_kb(query: str) -> str:
+        """Retrieves from knowledgebase context suitable for the query. Shall be always used when user asks question.
+        Args:
+            query: a query to knowledgebase which helps answer user's question
+        Returns:
+            Context from knowledgebase suitable for the query.
+        """
+        
+        found_docs = search(query)
+        if found_docs:
+            result = "\n\n".join([doc.page_content for doc in found_docs[:30]])
+            if anonymizer:
+                result = anonymizer.anonimize(result)
+            return result
+        else:
+            return "No matching information found."
+    return search_kb
 
 if __name__ == '__main__':
+    search_kb = get_search_tool()
     answer = search_kb("КАкие курсы предлагат Зерокодер?")
     print(answer)
 

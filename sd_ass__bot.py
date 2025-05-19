@@ -1,3 +1,4 @@
+from http.client import HTTPException
 import logging
 logging.basicConfig(level=logging.INFO)
 
@@ -19,6 +20,8 @@ from thread_settings import ThreadSettings
 
 from utils import _send_response, summarise_image, image_to_uri, ModelType
 
+from palimpsest.logger_factory import setup_logging
+
 
 def run_bot():
 
@@ -30,7 +33,7 @@ def run_bot():
         user_id = message.from_user.id
         chat_id = message.chat.id
         chats[chat_id] = ThreadSettings(user_id=user_id, chat_id=chat_id, model=ModelType.YA)
-        
+
         assistant = chats[chat_id].assistant
         #resetting memory
         assistant.invoke(
@@ -55,7 +58,7 @@ def run_bot():
         user_id = message.from_user.id
         chat_id = message.chat.id
         chats[chat_id] = ThreadSettings(user_id=user_id, chat_id=chat_id)
-        
+
         #resetting memory
         assistant = chats[chat_id].assistant
         assistant.invoke(
@@ -68,7 +71,7 @@ def run_bot():
         chat_id = message.chat.id
         user_id = message.from_user.id
         image_uri = []
-        if not chat_id in chats:
+        if chat_id not in chats:
             chats[chat_id] = ThreadSettings(user_id=user_id, chat_id=chat_id)
         if message.content_type == 'voice':
             #bot.send_message(user_id, "Распознаю голосовое сообщение...")
@@ -79,11 +82,11 @@ def run_bot():
                 ogg_file_path = f"voice_{user_id}_{uuid.uuid4()}.ogg"
                 with open(ogg_file_path, 'wb') as f:
                     f.write(downloaded_file)
-                
+
                 # Передаём путь к OGG-файлу в recognise_text
                 query = recognise_text(ogg_file_path)
                 os.remove(ogg_file_path)
-                
+
                 if not query:
                     bot.send_message(user_id, "Не удалось распознать голосовое сообщение. Пожалуйста, отправьте текст вручную или попробуйте снова.")
                     return
@@ -145,16 +148,19 @@ def run_bot():
             _send_response(event, _printed, thread=chats[chat_id], bot=bot, usr_msg=message)
 
     while True:
-        bot.polling(none_stop=True, timeout=60)
-        #try:
-        #    bot.polling(none_stop=True, timeout=60)
-        #except ApiTelegramException as e:
-        #    logging.error(f"Telegram API error: {e}")
-        #    time.sleep(5)
+        try:
+            bot.polling(none_stop=True, timeout=60)
+        except ApiTelegramException as e:
+            logging.error(f"Telegram API error: {e}")
+            time.sleep(5)
+        except HTTPException as e:
+            logging.error(f"HTTP error: {e}")
+            time.sleep(5)
         #except Exception as e:
         #    logging.error(f"Unexpected error in bot polling: {e}")
         #    time.sleep(5)
 
 
 if __name__ == '__main__':
+    setup_logging("sd_assistant", project_console_level=logging.DEBUG, other_console_level=logging.WARNING)
     run_bot()

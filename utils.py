@@ -48,33 +48,29 @@ def create_tool_node_with_fallback(tools: list) -> dict:
 
 
 def _print_event(event: dict, _printed: set, max_length=1500):
-    current_state = event.get("dialog_state")
-    if current_state:
+    if current_state := event.get("dialog_state"):
         print("Currently in: ", current_state[-1])
-    message = event.get("messages")
-    if message:
+    if message := event.get("messages"):
         if isinstance(message, list):
             message = message[-1]
         if message.id not in _printed:
             msg_repr = message.pretty_repr(html=True)
             if len(msg_repr) > max_length:
-                msg_repr = msg_repr[:max_length] + " ... (truncated)"
+                msg_repr = f"{msg_repr[:max_length]} ... (truncated)"
             print(msg_repr)
             _printed.add(message.id)
 
 def _print_response(event: dict, _printed: set, max_length=1500):
-    current_state = event.get("dialog_state")
-    if current_state:
+    if current_state := event.get("dialog_state"):
         print("Currently in: ", current_state[-1])
-    message = event.get("messages")
-    if message:
+    if message := event.get("messages"):
         if isinstance(message, list):
             message = message[-1]
         if message.id not in _printed:
             if message.type == "ai" and message.content.strip() != "":
                 msg_repr = message.content.strip()
                 if len(msg_repr) > max_length:
-                    msg_repr = msg_repr[:max_length] + " ... (truncated)"
+                    msg_repr = f"{msg_repr[:max_length]} ... (truncated)"
                 print(msg_repr)
             _printed.add(message.id)
 
@@ -94,18 +90,16 @@ def send_text_element(chat_id, element_content, bot, usr_msg = None):
 
 
 def _send_response(event: dict, _printed: set, thread, bot, usr_msg=None, max_length=0):
-    current_state = event.get("dialog_state")
-    if current_state:
+    if current_state := event.get("dialog_state"):
         print("Currently in: ", current_state[-1])
-    message = event.get("messages")
-    if message:
+    if message := event.get("messages"):
         if isinstance(message, list):
             message = message[-1]
         if message.id not in _printed:
             if message.type == "ai" and message.content.strip() != "":
                 msg_repr = message.content.strip()
                 if max_length > 0 and len(msg_repr) > max_length:
-                    msg_repr = msg_repr[:max_length] + " ... (truncated)"
+                    msg_repr = f"{msg_repr[:max_length]} ... (truncated)"
                 send_text_element(thread.chat_id, msg_repr, bot, usr_msg)
             _printed.add(message.id)
 
