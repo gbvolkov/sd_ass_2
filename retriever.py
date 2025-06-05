@@ -28,6 +28,7 @@ from langgraph.prebuilt import tools_condition
 
 from langchain_community.vectorstores import FAISS
 from palimpsest import Palimpsest
+from teamly_retriever import TeamlyRetriever
 
 import config
 
@@ -64,7 +65,7 @@ def get_retriever_multi():
     return search
 
 
-def get_retriever():
+def get_retriever_plain():
     #Load document store from persisted storage
     #loading list of problem numbers as ids
     
@@ -95,6 +96,44 @@ def get_retriever():
         return result
     return search
 
+def get_retriever():
+    #Load document store from persisted storage
+    #loading list of problem numbers as ids
+    MAX_RETRIEVALS = 3
+
+
+    vector_store_path = config.ASSISTANT_INDEX_FOLDER
+    vectorstore = load_vectorstore(vector_store_path, config.EMBEDDING_MODEL)
+    with open(f'{vector_store_path}/docstore.pkl', 'rb') as file:
+        documents = pickle.load(file)
+
+    doc_ids = [doc.metadata.get('problem_number', '') for doc in documents]
+    store = InMemoryByteStore()
+    id_key = "problem_number"
+    multi_retriever = MultiVectorRetriever(
+            vectorstore=vectorstore,
+            byte_store=store,
+            id_key=id_key,
+            search_kwargs={"k": MAX_RETRIEVALS},
+        )
+    multi_retriever.docstore.mset(list(zip(doc_ids, documents)))
+
+    teamly_retriever = TeamlyRetriever("./auth.json", k=5)
+
+    ensemble_retriever = EnsembleRetriever(
+        retrievers = [teamly_retriever, multi_retriever],
+        weights=[0.8, 0.2])
+    
+    reranker_model = HuggingFaceCrossEncoder(model_name=config.RERANKING_MODEL)
+    RERANKER = CrossEncoderReranker(model=reranker_model, top_n=MAX_RETRIEVALS)
+    retriever = ContextualCompressionRetriever(
+            base_compressor=RERANKER, base_retriever=ensemble_retriever
+            )
+
+    def search(query: str) -> List[Document]:
+        result = retriever.invoke(query, search_kwargs={"k": MAX_RETRIEVALS})
+        return result
+    return search
 
 search = get_retriever()
 
@@ -121,7 +160,7 @@ def get_search_tool(anonymizer: Palimpsest = None):
 
 if __name__ == '__main__':
     search_kb = get_search_tool()
-    answer = search_kb("КАкие курсы предлагат Зерокодер?")
+    answer = search_kb("Кто такие кей юзеры?")
     print(answer)
 
 

@@ -57,13 +57,13 @@ def assistant_factory(model: ModelType):
     # Haiku is faster and cheaper, but less accurate
     # llm = ChatAnthropic(model="claude-3-haiku-20240307")
     
-    processor = Palimpsest(verbose=True)
+    #processor = Palimpsest(verbose=False)
 
-    def anonymize(text):
-        return processor.anonimize(text)
+    #def anonymize(text):
+    #    return processor.anonimize(text)
 
-    def deanonymize(text):
-        return processor.deanonimize(text)
+    #def deanonymize(text):
+    #    return processor.deanonimize(text)
     
     subject = "IT systems and business processes of Interleasing"
     
@@ -123,8 +123,8 @@ def assistant_factory(model: ModelType):
     #assistant_chain = {"messages": lambda txt: anonymize(txt, language="en")} | primary_assistant_prompt | llm.bind_tools(assistant_tools) | (lambda ai_message: deanonymize(ai_message))
     #anon_llm = ChatModelInterceptor(llm, anonymize, deanonymize)
     tooled_llm = llm.bind_tools(assistant_tools)
-    anon_llm = AnonimizedChatModelProxy(tooled_llm, anonymize, deanonymize)
-
-    assistant_chain = primary_assistant_prompt | anon_llm
+    #anon_llm = AnonimizedChatModelProxy(tooled_llm, anonymize, deanonymize)
+    
+    assistant_chain = primary_assistant_prompt | tooled_llm
     
     return assistant_chain, assistant_tools

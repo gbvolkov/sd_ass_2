@@ -2,4 +2,6 @@ __pycache__
 .venv
 data
 logs
+models
 gv.env
+auth.json
