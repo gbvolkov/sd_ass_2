@@ -187,6 +187,10 @@ class TeamlyRetriever(BaseRetriever):
 
     def _semantic_search(self, query: str) -> list[dict]:
         """Raw semantic search – returns the provider’s JSON hits."""
+        payload = {
+            "query": query,
+            "limit": 2048
+        }
         return self._post("/api/v1/semantic/external/search", {"query": query})
 
     def _to_document(self, hit: dict) -> Document:
@@ -253,7 +257,7 @@ if __name__ == "__main__":
         
     retriever = TeamlyRetriever("./auth.json", k=5)
 
-    llm = ChatOpenAI(model="gpt-4.1")
+    llm = ChatOpenAI(model="gpt-4.1-mini")
     with open("./prompt.txt", encoding="utf-8") as f:
         prompt_txt = f.read()
     system_prompt = ChatPromptTemplate.from_messages(
