@@ -5,3 +5,4 @@ logs
 models
 gv.env
 auth.json
+nohup.out
