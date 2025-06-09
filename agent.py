@@ -36,8 +36,8 @@ def reset_memory(state: State) -> State:
         "messages": [RemoveMessage(id=mid) for mid in all_msg_ids]
     }
 
-def initialize_agent(model: ModelType = ModelType.GPT):
-    llm, assistant_tools = assistant_factory(model)
+def initialize_agent(model: ModelType = ModelType.GPT, role: str = "default"):
+    llm, assistant_tools = assistant_factory(model, role)
 
 
     builder = StateGraph(State)

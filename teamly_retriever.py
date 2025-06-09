@@ -189,9 +189,9 @@ class TeamlyRetriever(BaseRetriever):
         """Raw semantic search – returns the provider’s JSON hits."""
         payload = {
             "query": query,
-            "limit": 2048
+            "limit": 8196
         }
-        return self._post("/api/v1/semantic/external/search", {"query": query})
+        return self._post("/api/v1/semantic/external/search", payload)
 
     def _to_document(self, hit: dict) -> Document:
         """

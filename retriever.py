@@ -118,7 +118,7 @@ def get_retriever():
         )
     multi_retriever.docstore.mset(list(zip(doc_ids, documents)))
 
-    teamly_retriever = TeamlyRetriever("./auth.json", k=5)
+    teamly_retriever = TeamlyRetriever("./auth.json", k=10)
 
     ensemble_retriever = EnsembleRetriever(
         retrievers = [teamly_retriever, multi_retriever],

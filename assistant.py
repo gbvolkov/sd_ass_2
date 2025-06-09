@@ -52,7 +52,7 @@ class Assistant:
         return {"messages": result}
 
 
-def assistant_factory(model: ModelType):
+def assistant_factory(model: ModelType, role: str = "default"):
 
     # Haiku is faster and cheaper, but less accurate
     # llm = ChatAnthropic(model="claude-3-haiku-20240307")
@@ -65,11 +65,13 @@ def assistant_factory(model: ModelType):
     #def deanonymize(text):
     #    return processor.deanonimize(text)
     
-    subject = "IT systems and business processes of Interleasing"
-    
-    with open("prompts/working_prompt.txt", encoding="utf-8") as f:
-        prompt_txt = f.read()
-    prompt = eval(f"f'''{prompt_txt}'''")
+    if role == "sales_manager":
+        with open("prompts/working_prompt_sales.txt", encoding="utf-8") as f:
+            prompt = f.read()
+    else:
+        with open("prompts/working_prompt.txt", encoding="utf-8") as f:
+            prompt = f.read()
+        
 
     if model == ModelType.MISTRAL:
         llm = ChatMistralAI(model="mistral-large-latest", temperature=1, frequency_penalty=0.3)

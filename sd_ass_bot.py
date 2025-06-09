@@ -32,7 +32,8 @@ def run_bot():
     def send_welcome(message):
         user_id = message.from_user.id
         chat_id = message.chat.id
-        chats[chat_id] = ThreadSettings(user_id=user_id, chat_id=chat_id, model=ModelType.YA)
+        role = message.any_text[len("/start"):].strip()
+        chats[chat_id] = ThreadSettings(user_id=user_id, chat_id=chat_id, model=ModelType.GPT, role=role)
 
         assistant = chats[chat_id].assistant
         #resetting memory
@@ -57,7 +58,8 @@ def run_bot():
     def reset_memory(message):
         user_id = message.from_user.id
         chat_id = message.chat.id
-        chats[chat_id] = ThreadSettings(user_id=user_id, chat_id=chat_id)
+        role = message.any_text[len("/reset"):].strip()
+        chats[chat_id] = ThreadSettings(user_id=user_id, chat_id=chat_id, role=role)
 
         #resetting memory
         assistant = chats[chat_id].assistant
@@ -65,6 +67,31 @@ def run_bot():
             {"messages": [HumanMessage(content=[{"type": "reset", "text": "RESET"}])]}, chats[chat_id].get_config(), stream_mode="values"
         )
         bot.send_message(user_id, "Память бота очищена.")
+    
+    @bot.message_handler(commands=['role'])
+    def set_role(message):
+        user_id = message.from_user.id
+        chat_id = message.chat.id
+        role = message.any_text[len("/role"):].strip()
+        chats[chat_id] = ThreadSettings(user_id=user_id, chat_id=chat_id, role=role)
+
+        #resetting memory
+        assistant = chats[chat_id].assistant
+        assistant.invoke(
+            {"messages": [HumanMessage(content=[{"type": "reset", "text": "RESET"}])]}, chats[chat_id].get_config(), stream_mode="values"
+        )
+        
+        query = "Привет! Представься пожалуйста и расскажи о себе."
+        messages = HumanMessage(
+            content=[{"type": "text", "text": query}]
+        )
+        events = assistant.stream(
+            {"messages": [messages]}, chats[chat_id].get_config(), stream_mode="values"
+        )
+        _printed = set()
+        for event in events:
+            bot.send_chat_action(chat_id=chat_id, action="typing", timeout=30)
+            _send_response(event, _printed, thread=chats[chat_id], bot=bot)
 
     @bot.message_handler(content_types=['text', 'voice', 'photo', 'document'])
     def handle_message(message):
