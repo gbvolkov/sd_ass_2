@@ -2,14 +2,14 @@ import logging
 
 logging.basicConfig(level=logging.DEBUG, format='%(asctime)s - %(levelname)s - %(message)s')
 
-from hf_tools.chat_local import ChatLocalTools
+from agents.assistants.hf_tools.chat_local import ChatLocalTools
 from langchain_core.prompts import ChatPromptTemplate
 
 from langchain_core.messages import HumanMessage
 
 from langchain_core.tools import tool
 from datetime import date, datetime
-from retriever import search_kb
+from agents.retrievers.retriever import search_kb
 
 import os
 import config

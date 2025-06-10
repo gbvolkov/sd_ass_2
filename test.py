@@ -1,4 +1,4 @@
-from hf_tools.chat_local import ChatLocalTools
+from agents.assistants.hf_tools.chat_local import ChatLocalTools
 from langchain_core.messages import HumanMessage
 import os
 from langchain_core.tools import tool

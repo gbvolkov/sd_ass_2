@@ -1,5 +1,5 @@
-from utils import ModelType
-from agent import initialize_agent
+from agents.utils import ModelType
+from agents.agent import initialize_agent
 
 class ThreadSettings():
     def __init__(self, user_id, chat_id, model=ModelType.GPT, role="default"):

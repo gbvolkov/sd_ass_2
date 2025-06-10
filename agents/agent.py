@@ -5,7 +5,7 @@ import os
 os.environ["LANGCHAIN_ENDPOINT"]="https://api.smith.langchain.com"
 os.environ["LANGCHAIN_TRACING_V2"] = "true"
 
-from utils import ModelType
+from agents.utils import ModelType
 
 from langgraph.checkpoint.memory import MemorySaver
 from langgraph.graph import END, StateGraph, START
@@ -13,10 +13,10 @@ from langgraph.prebuilt import tools_condition
 
 from langchain_core.messages.modifier import RemoveMessage
 
-from state import State
-from assistant import Assistant, assistant_factory
-from utils import create_tool_node_with_fallback, show_graph, _print_event, _print_response
-from user_info import user_info
+from agents.state import State
+from agents.assistants.assistant import Assistant, assistant_factory
+from agents.utils import create_tool_node_with_fallback, show_graph, _print_event, _print_response
+from agents.user_info import user_info
 
 
 

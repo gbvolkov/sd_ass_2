@@ -1,6 +1,7 @@
 from typing import List, Any, Optional, Dict, Tuple ,TypedDict, Annotated
 import os
 import pickle
+import torch
 
 from langchain_community.document_loaders import NotionDBLoader
 from langchain_community.document_loaders import NotionDirectoryLoader
@@ -27,8 +28,12 @@ from langgraph.graph import START, END, StateGraph
 from langgraph.prebuilt import tools_condition
 
 from langchain_community.vectorstores import FAISS
+
 from palimpsest import Palimpsest
-from teamly_retriever import TeamlyRetriever
+from agents.retrievers.teamly_retriever import (
+    TeamlyRetriever, 
+    TeamlyContextualCompressionRetriever
+)
 
 import config
 
@@ -52,9 +57,9 @@ def get_retriever_multi():
         weights=[0.5, 0.5]                  # adjust to favor text vs. images
     )
     reranker_model = HuggingFaceCrossEncoder(model_name=config.RERANKING_MODEL)
-    RERANKER = CrossEncoderReranker(model=reranker_model, top_n=3)
+    reranker = CrossEncoderReranker(model=reranker_model, top_n=3)
     retriever = ContextualCompressionRetriever(
-            base_compressor=RERANKER, base_retriever=ensemble
+            base_compressor=reranker, base_retriever=ensemble
             )
 
     def search(query: str) -> List[Document]:
@@ -72,7 +77,7 @@ def get_retriever_plain():
     vector_store_path = config.ASSISTANT_INDEX_FOLDER
     vectorstore = load_vectorstore(vector_store_path, config.EMBEDDING_MODEL)
     reranker_model = HuggingFaceCrossEncoder(model_name=config.RERANKING_MODEL)
-    RERANKER = CrossEncoderReranker(model=reranker_model, top_n=3)
+    reranker = CrossEncoderReranker(model=reranker_model, top_n=3)
     with open(f'{vector_store_path}/docstore.pkl', 'rb') as file:
         documents = pickle.load(file)
 
@@ -88,7 +93,7 @@ def get_retriever_plain():
         )
     multi_retriever.docstore.mset(list(zip(doc_ids, documents)))
     retriever = ContextualCompressionRetriever(
-            base_compressor=RERANKER, base_retriever=multi_retriever
+            base_compressor=reranker, base_retriever=multi_retriever
             )
 
     def search(query: str) -> List[Document]:
@@ -102,32 +107,37 @@ def get_retriever():
     MAX_RETRIEVALS = 3
 
 
-    vector_store_path = config.ASSISTANT_INDEX_FOLDER
-    vectorstore = load_vectorstore(vector_store_path, config.EMBEDDING_MODEL)
-    with open(f'{vector_store_path}/docstore.pkl', 'rb') as file:
-        documents = pickle.load(file)
+    #vector_store_path = config.ASSISTANT_INDEX_FOLDER
+    #vectorstore = load_vectorstore(vector_store_path, config.EMBEDDING_MODEL)
+    #with open(f'{vector_store_path}/docstore.pkl', 'rb') as file:
+    #    documents = pickle.load(file)
 
-    doc_ids = [doc.metadata.get('problem_number', '') for doc in documents]
-    store = InMemoryByteStore()
-    id_key = "problem_number"
-    multi_retriever = MultiVectorRetriever(
-            vectorstore=vectorstore,
-            byte_store=store,
-            id_key=id_key,
-            search_kwargs={"k": MAX_RETRIEVALS},
-        )
-    multi_retriever.docstore.mset(list(zip(doc_ids, documents)))
+    #doc_ids = [doc.metadata.get('problem_number', '') for doc in documents]
+    #store = InMemoryByteStore()
+    #id_key = "problem_number"
+    #multi_retriever = MultiVectorRetriever(
+    #        vectorstore=vectorstore,
+    #        byte_store=store,
+    #        id_key=id_key,
+    #        search_kwargs={"k": MAX_RETRIEVALS},
+    #    )
+    #multi_retriever.docstore.mset(list(zip(doc_ids, documents)))
 
-    teamly_retriever = TeamlyRetriever("./auth.json", k=10)
+    teamly_retriever = TeamlyRetriever("./auth.json", k=40)
 
-    ensemble_retriever = EnsembleRetriever(
-        retrievers = [teamly_retriever, multi_retriever],
-        weights=[0.8, 0.2])
-    
-    reranker_model = HuggingFaceCrossEncoder(model_name=config.RERANKING_MODEL)
-    RERANKER = CrossEncoderReranker(model=reranker_model, top_n=MAX_RETRIEVALS)
-    retriever = ContextualCompressionRetriever(
-            base_compressor=RERANKER, base_retriever=ensemble_retriever
+    #ensemble_retriever = EnsembleRetriever(
+    #    retrievers = [teamly_retriever, multi_retriever],
+    #    weights=[0.8, 0.2])
+
+    if torch.cuda.is_available():
+        device = "cuda"
+    else:
+        device="cpu"
+
+    reranker_model = HuggingFaceCrossEncoder(model_name=config.RERANKING_MODEL, model_kwargs = {'trust_remote_code': True, "device": device})
+    reranker = CrossEncoderReranker(model=reranker_model, top_n=MAX_RETRIEVALS)
+    retriever = TeamlyContextualCompressionRetriever(
+            base_compressor=reranker, base_retriever=teamly_retriever
             )
 
     def search(query: str) -> List[Document]:

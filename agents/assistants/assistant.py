@@ -6,7 +6,7 @@ from langchain_openai import ChatOpenAI
 from langchain_mistralai import ChatMistralAI
 #from langchain_community.llms.yandex import YandexGPT
 #from langchain_community.chat_models import ChatYandexGPT
-from yandex_tools.yandex_tooling import ChatYandexGPTWithTools as ChatYandexGPT
+from agents.assistants.yandex_tools.yandex_tooling import ChatYandexGPTWithTools as ChatYandexGPT
 from langchain_gigachat import GigaChat
 
 from langchain_huggingface import HuggingFacePipeline, ChatHuggingFace, HuggingFaceEndpoint
@@ -20,12 +20,12 @@ from langchain.agents import initialize_agent, AgentType
 
 from transformers import AutoModelForCausalLM, AutoTokenizer, pipeline
 
-from retriever import get_search_tool
-from tools import get_support_contact, get_discounts_and_actions, get_customer_manager_contact
-from utils import ModelType
-from state import State
+from agents.retrievers.retriever import get_search_tool
+from agents.tools import get_support_contact, get_discounts_and_actions, get_customer_manager_contact
+from agents.utils import ModelType
+from agents.state import State
 
-from hf_tools.chat_local import ChatLocalTools
+from agents.assistants.hf_tools.chat_local import ChatLocalTools
 
 from palimpsest import Palimpsest
 import logging
@@ -114,7 +114,7 @@ def assistant_factory(model: ModelType, role: str = "default"):
 
 
     #assistant_chain = primary_assistant_prompt | llm.bind_tools(assistant_tools)
-    from chat_model_wrapper import AnonimizedChatModelProxy, make_anonymized_tool
+    from agents.assistants.chat_model_wrapper import AnonimizedChatModelProxy, make_anonymized_tool
 
     #search_kb = get_search_tool(processor)
     search_kb = get_search_tool()

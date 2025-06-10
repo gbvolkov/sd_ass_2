@@ -12,13 +12,14 @@ from langchain_core.messages import HumanMessage
 import time, uuid, json, os, base64
 from collections import defaultdict
 
-os.environ["CUDA_VISIBLE_DEVICES"] = ""
+if config.NO_CUDA == "True":
+    os.environ["CUDA_VISIBLE_DEVICES"] = ""
 
 from vrecog.vrecog import recognise_text
 
 from thread_settings import ThreadSettings
 
-from utils import _send_response, summarise_image, image_to_uri, ModelType
+from agents.utils import _send_response, summarise_image, image_to_uri, ModelType
 
 from palimpsest.logger_factory import setup_logging
 
@@ -183,9 +184,9 @@ def run_bot():
         except HTTPException as e:
             logging.error(f"HTTP error: {e}")
             time.sleep(5)
-        #except Exception as e:
-        #    logging.error(f"Unexpected error in bot polling: {e}")
-        #    time.sleep(5)
+        except Exception as e:
+            logging.error(f"Unexpected error in bot polling: {e}")
+            time.sleep(5)
 
 
 if __name__ == '__main__':
