@@ -21,9 +21,8 @@ from langchain.agents import initialize_agent, AgentType
 from transformers import AutoModelForCausalLM, AutoTokenizer, pipeline
 
 from agents.retrievers.retriever import get_search_tool
-from agents.tools import get_support_contact, get_discounts_and_actions, get_customer_manager_contact
 from agents.utils import ModelType
-from agents.state import State
+from agents.state.state import State
 
 from agents.assistants.hf_tools.chat_local import ChatLocalTools
 
@@ -37,7 +36,11 @@ class Assistant:
 
     def __call__(self, state: State, config: RunnableConfig):
         while True:
-            result = self.runnable.invoke(state)
+            try:
+                result = self.runnable.invoke(state)
+            except Exception as e:
+                logging.error(f"HTTP error: {e}")
+                raise e
             if (
                 result.tool_calls
                 or result.content
@@ -52,7 +55,7 @@ class Assistant:
         return {"messages": result}
 
 
-def assistant_factory(model: ModelType, role: str = "default"):
+def assistant_factory(model: ModelType, role: str = "default", tools = []):
 
     # Haiku is faster and cheaper, but less accurate
     # llm = ChatAnthropic(model="claude-3-haiku-20240307")
@@ -68,8 +71,14 @@ def assistant_factory(model: ModelType, role: str = "default"):
     if role == "sales_manager":
         with open("prompts/working_prompt_sales.txt", encoding="utf-8") as f:
             prompt = f.read()
-    else:
+    elif role == "service_desk":
         with open("prompts/working_prompt.txt", encoding="utf-8") as f:
+            prompt = f.read()
+    elif role == "supervisor":
+        with open("prompts/supervisor_prompt.txt", encoding="utf-8") as f:
+            prompt = f.read()
+    else:
+        with open("prompts/working_prompt_employee.txt", encoding="utf-8") as f:
             prompt = f.read()
         
 
@@ -110,17 +119,18 @@ def assistant_factory(model: ModelType, role: str = "default"):
         ]
     ).partial(time=datetime.now)
 
-    web_search_tool = DuckDuckGoSearchRun()
-
 
     #assistant_chain = primary_assistant_prompt | llm.bind_tools(assistant_tools)
-    from agents.assistants.chat_model_wrapper import AnonimizedChatModelProxy, make_anonymized_tool
+    #from agents.assistants.chat_model_wrapper import AnonimizedChatModelProxy, make_anonymized_tool
 
     #search_kb = get_search_tool(processor)
-    search_kb = get_search_tool()
-    assistant_tools = [
-        search_kb
-    ]
+    if not tools or len(tools) == 0:
+        search_kb = get_search_tool()
+        assistant_tools = [
+            search_kb
+        ]
+    else:
+        assistant_tools = tools
 
     #assistant_chain = {"messages": lambda txt: anonymize(txt, language="en")} | primary_assistant_prompt | llm.bind_tools(assistant_tools) | (lambda ai_message: deanonymize(ai_message))
     #anon_llm = ChatModelInterceptor(llm, anonymize, deanonymize)

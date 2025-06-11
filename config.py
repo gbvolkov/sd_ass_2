@@ -70,3 +70,5 @@ CHATS_INDEX_FOLDER = os.environ.get('CHATS_INDEX_FOLDER') or "./data/chats_idx"
 ASSISTANT_INDEX_FOLDER = os.environ.get('ASSISTANT_INDEX_FOLDER') or "./data/ass_idx"
 RERANKING_MODEL = os.environ.get('RERANKING_MODEL') or '/models/bge-reranker-large'
 NO_CUDA = os.environ.get('NO_CUDA', "False")
+
+DEBUG_WORKFLOW = (os.environ.get('DEBUG_WORKFLOW', default='False').lower() == 'true')

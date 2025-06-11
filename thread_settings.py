@@ -1,8 +1,14 @@
 from agents.utils import ModelType
 from agents.agent import initialize_agent
+from agents.state.state import ConfigSchema
+
+from user_manager.utils import UserManager
+from langchain_core.runnables import RunnableConfig
 
 class ThreadSettings():
-    def __init__(self, user_id, chat_id, model=ModelType.GPT, role="default"):
+    user_man = UserManager()
+
+    def __init__(self, user_id, chat_id, model=ModelType.GPT):
         self.model=model
         self.question = ''
         self.answer = ''
@@ -14,7 +20,7 @@ class ThreadSettings():
         self._assistant = None
         self.user_id = user_id
         self.chat_id = chat_id
-        self.role = role
+        self.role = ThreadSettings.user_man.get_role(user_id)
 
     @property
     def assistant(self): 
@@ -28,13 +34,16 @@ class ThreadSettings():
         self._assistant = assistant
 
     def get_config(self):
-        return {
-            "configurable": {
-                # The user_id is used in our tools to
-                # fetch the user's information
-                "user_info": self.user_id,
-                "user_role": self.role,
-                # Checkpoints are accessed by thread_id
-                "thread_id": self.chat_id,
-            }
-        }
+        config = RunnableConfig(ConfigSchema({"user_id": self.user_id, "user_role": self.role, "model": ModelType.GPT, "thread_id": self.chat_id}))
+        
+        return config
+    #   {
+    #        "configurable": {
+    #            # The user_id is used in our tools to
+    #            # fetch the user's information
+    #            "user_info": self.user_id,
+    #            "user_role": self.role,
+    #            # Checkpoints are accessed by thread_id
+    #            "thread_id": self.chat_id,
+    #        }
+    #    }

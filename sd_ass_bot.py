@@ -23,7 +23,6 @@ from agents.utils import _send_response, summarise_image, image_to_uri, ModelTyp
 
 from palimpsest.logger_factory import setup_logging
 
-
 def run_bot():
 
     bot = telebot.TeleBot(config.TELEGRAM_BOT_TOKEN)
@@ -31,10 +30,9 @@ def run_bot():
 
     @bot.message_handler(commands=['start'])
     def send_welcome(message):
-        user_id = message.from_user.id
+        user_id = message.from_user.username
         chat_id = message.chat.id
-        role = message.any_text[len("/start"):].strip()
-        chats[chat_id] = ThreadSettings(user_id=user_id, chat_id=chat_id, model=ModelType.GPT, role=role)
+        chats[chat_id] = ThreadSettings(user_id=user_id, chat_id=chat_id, model=ModelType.GPT)
 
         assistant = chats[chat_id].assistant
         #resetting memory
@@ -57,10 +55,9 @@ def run_bot():
 
     @bot.message_handler(commands=['reset'])
     def reset_memory(message):
-        user_id = message.from_user.id
+        user_id = message.from_user.username
         chat_id = message.chat.id
-        role = message.any_text[len("/reset"):].strip()
-        chats[chat_id] = ThreadSettings(user_id=user_id, chat_id=chat_id, role=role)
+        chats[chat_id] = ThreadSettings(user_id=user_id, chat_id=chat_id)
 
         #resetting memory
         assistant = chats[chat_id].assistant
@@ -69,11 +66,14 @@ def run_bot():
         )
         bot.send_message(user_id, "Память бота очищена.")
     
+    """
     @bot.message_handler(commands=['role'])
     def set_role(message):
-        user_id = message.from_user.id
+        user_id = message.from_user.username
         chat_id = message.chat.id
         role = message.any_text[len("/role"):].strip()
+        #role = user_man.get_role(user_id)
+
         chats[chat_id] = ThreadSettings(user_id=user_id, chat_id=chat_id, role=role)
 
         #resetting memory
@@ -93,11 +93,11 @@ def run_bot():
         for event in events:
             bot.send_chat_action(chat_id=chat_id, action="typing", timeout=30)
             _send_response(event, _printed, thread=chats[chat_id], bot=bot)
-
+    """
     @bot.message_handler(content_types=['text', 'voice', 'photo', 'document'])
     def handle_message(message):
         chat_id = message.chat.id
-        user_id = message.from_user.id
+        user_id = message.from_user.username
         image_uri = []
         if chat_id not in chats:
             chats[chat_id] = ThreadSettings(user_id=user_id, chat_id=chat_id)
@@ -184,11 +184,11 @@ def run_bot():
         except HTTPException as e:
             logging.error(f"HTTP error: {e}")
             time.sleep(5)
-        except Exception as e:
-            logging.error(f"Unexpected error in bot polling: {e}")
-            time.sleep(5)
+        #except Exception as e:
+        #    logging.error(f"Unexpected error in bot polling: {e}")
+        #    time.sleep(5)
 
 
 if __name__ == '__main__':
-    setup_logging("sd_assistant", project_console_level=logging.DEBUG, other_console_level=logging.WARNING)
+    setup_logging("sd_assistant", project_console_level=logging.WARNING, other_console_level=logging.WARNING)
     run_bot()

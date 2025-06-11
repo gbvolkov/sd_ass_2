@@ -1,9 +1,9 @@
-from typing import Annotated
-
+from typing import Annotated, Optional
 from typing_extensions import TypedDict
 
 from langgraph.graph.message import AnyMessage, add_messages, Messages
 
+from agents.utils import ModelType
 
 def add_messages_no_img(msgs1: Messages, msgs2: Messages) -> Messages:
     # Need to clean up all user messages excepting the last message with type "human" (after which can follow messages with other types)
@@ -18,3 +18,9 @@ def add_messages_no_img(msgs1: Messages, msgs2: Messages) -> Messages:
 class State(TypedDict):
     messages: Annotated[list[AnyMessage], add_messages_no_img]
     user_info: str
+
+class ConfigSchema(TypedDict):
+    user_id: Optional[str]
+    user_role: Optional[str]
+    model: Optional[str]
+    thread_id: Optional[str]
