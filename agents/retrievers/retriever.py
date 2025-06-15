@@ -101,39 +101,11 @@ def get_retriever_plain():
         return result
     return search
 
-def get_retriever():
-    #Load document store from persisted storage
-    #loading list of problem numbers as ids
+def get_retriever_teamly():
     MAX_RETRIEVALS = 3
 
-
-    #vector_store_path = config.ASSISTANT_INDEX_FOLDER
-    #vectorstore = load_vectorstore(vector_store_path, config.EMBEDDING_MODEL)
-    #with open(f'{vector_store_path}/docstore.pkl', 'rb') as file:
-    #    documents = pickle.load(file)
-
-    #doc_ids = [doc.metadata.get('problem_number', '') for doc in documents]
-    #store = InMemoryByteStore()
-    #id_key = "problem_number"
-    #multi_retriever = MultiVectorRetriever(
-    #        vectorstore=vectorstore,
-    #        byte_store=store,
-    #        id_key=id_key,
-    #        search_kwargs={"k": MAX_RETRIEVALS},
-    #    )
-    #multi_retriever.docstore.mset(list(zip(doc_ids, documents)))
-
     teamly_retriever = TeamlyRetriever("./auth.json", k=40)
-
-    #ensemble_retriever = EnsembleRetriever(
-    #    retrievers = [teamly_retriever, multi_retriever],
-    #    weights=[0.8, 0.2])
-
-    if torch.cuda.is_available():
-        device = "cuda"
-    else:
-        device="cpu"
-
+    device = "cuda" if torch.cuda.is_available() else "cpu"
     reranker_model = HuggingFaceCrossEncoder(model_name=config.RERANKING_MODEL, model_kwargs = {'trust_remote_code': True, "device": device})
     reranker = CrossEncoderReranker(model=reranker_model, top_n=MAX_RETRIEVALS)
     retriever = TeamlyContextualCompressionRetriever(
@@ -143,7 +115,48 @@ def get_retriever():
     def search(query: str) -> List[Document]:
         result = retriever.invoke(query, search_kwargs={"k": MAX_RETRIEVALS})
         return result
+
     return search
+
+
+def get_retroever_faiss():
+    MAX_RETRIEVALS = 3
+
+    vector_store_path = config.ASSISTANT_INDEX_FOLDER
+    vectorstore = load_vectorstore(vector_store_path, config.EMBEDDING_MODEL)
+    with open(f'{vector_store_path}/docstore.pkl', 'rb') as file:
+        documents = pickle.load(file)
+
+    doc_ids = [doc.metadata.get('problem_number', '') for doc in documents]
+    store = InMemoryByteStore()
+    id_key = "problem_number"
+    multi_retriever = MultiVectorRetriever(
+            vectorstore=vectorstore,
+            byte_store=store,
+            id_key=id_key,
+            search_kwargs={"k": MAX_RETRIEVALS},
+        )
+    multi_retriever.docstore.mset(list(zip(doc_ids, documents)))
+
+    device = "cuda" if torch.cuda.is_available() else "cpu"
+    reranker_model = HuggingFaceCrossEncoder(model_name=config.RERANKING_MODEL, model_kwargs = {'trust_remote_code': True, "device": device})
+    reranker = CrossEncoderReranker(model=reranker_model, top_n=MAX_RETRIEVALS)
+    retriever = ContextualCompressionRetriever(
+            base_compressor=reranker, base_retriever=multi_retriever
+            )
+
+    def search(query: str) -> List[Document]:
+        result = retriever.invoke(query, search_kwargs={"k": MAX_RETRIEVALS})
+        return result
+
+    return search
+
+
+def get_retriever():
+    retriever_type = config.RETRIEVER_TYPE
+    if retriever_type == "teamly":
+        return get_retriever_teamly()
+    return get_retroever_faiss()
 
 search = get_retriever()
 

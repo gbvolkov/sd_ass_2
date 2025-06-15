@@ -5,6 +5,7 @@ notion-client
 openai-whisper
 
 langgraph
+langgraph_supervisor
 
 langchain_core
 langchain
