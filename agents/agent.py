@@ -160,11 +160,8 @@ def initialize_agent_supervisor(model: ModelType = ModelType.GPT, role: str = "d
     return builder.compile(name="interleasing_qa_agent", checkpointer=memory)
 
 def initialize_agent(model: ModelType = ModelType.GPT, role: str = "default"):
-    agent_llm = ChatOpenAI(model="gpt-4.1-mini", temperature=1)
     team_llm = ChatOpenAI(model="gpt-4.1-nano", temperature=0.7)
 
-    #llm_role, assistant_tools_role = assistant_factory(model, role)
-    #llm_default, assistant_tools_default = assistant_factory(model, "default")
     search_kb = get_search_tool()
     search_tools = [
         search_kb
@@ -184,7 +181,7 @@ def initialize_agent(model: ModelType = ModelType.GPT, role: str = "default"):
     
 
     builder = StateGraph(State, config_schema=ConfigSchema)
-    # Define nodes: these do the work
+    # Define nodes
     builder.add_node("fetch_user_info", user_info)
     builder.add_node("reset_memory", reset_memory)
 
@@ -192,18 +189,13 @@ def initialize_agent(model: ModelType = ModelType.GPT, role: str = "default"):
     builder.add_node("sd_agent", sd_agent)
     builder.add_node("default_agent", default_agent)
 
+    # Define edges
     builder.add_edge(START, "fetch_user_info")
     builder.add_conditional_edges(
         "fetch_user_info",
         route_request,
     )
     builder.add_edge("reset_memory", END)
-
-    #builder.add_conditional_edges(
-    #    "assistant",
-    #    tools_condition,
-    #)
-    #builder.add_edge("tools", "assistant")
 
     # The checkpointer lets the graph persist its state
     # this is a complete memory for the entire graph.

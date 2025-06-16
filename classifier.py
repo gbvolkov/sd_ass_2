@@ -45,13 +45,16 @@ def classify_request(request: str) -> str:
         "labels": list(lables.keys()),
         "samples": samples
     }
-    response = requests.post(api_url, headers=header, json=prompt)
-    response.raise_for_status()
-    result = json.loads(response.text)
-    predictions = result["predictions"]
-    predictions.sort(key = lambda x: x["confidence"], reverse=True)
-    defined_class = predictions[0]["label"]
-    return lables[defined_class]
+    try:
+        response = requests.post(api_url, headers=header, json=prompt)
+        response.raise_for_status()
+        result = json.loads(response.text)
+        predictions = result["predictions"]
+        predictions.sort(key = lambda x: x["confidence"], reverse=True)
+        defined_class = predictions[0]["label"]
+        return lables[defined_class]
+    except:
+        return "default_agent"
 
 if __name__ == "__main__":
     user_queries =  [
