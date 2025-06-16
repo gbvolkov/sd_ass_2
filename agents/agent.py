@@ -12,8 +12,9 @@ from langgraph.graph import END, StateGraph, START
 from langgraph.prebuilt import tools_condition
 
 from langchain_openai import ChatOpenAI
+from langchain_mistralai import ChatMistralAI
 from langchain_gigachat import GigaChat
-from agents.assistants.yandex_tools.yandex_tooling import ChatYandexGPTWithTools as ChatYandexGPT
+from agents.assistants.yandex_tools.yandex_tooling import ChatYandexGPTWithTools as ChatYandexGPTTolls
 
 from langchain_core.messages.modifier import RemoveMessage
 
@@ -21,7 +22,7 @@ from langgraph_supervisor import create_supervisor
 from langgraph.prebuilt.chat_agent_executor import create_react_agent
 
 
-
+from classifier import classify_request
 from agents.state.state import State, ConfigSchema
 from agents.assistants.assistant import Assistant, assistant_factory
 from agents.utils import create_tool_node_with_fallback, show_graph, _print_event, _print_response
@@ -33,10 +34,12 @@ from agents.retrievers.retriever import get_search_tool
 import logging
 logger = logging.getLogger(__name__)
 
-def reset_memory_condition(state: State) -> str:
+def route_request(state: State) -> str:
     if state["messages"][-1].content[0].get("type") == "reset":
         return "reset_memory"
-    return "assistant"
+    agent_class = classify_request(state["messages"][-1].content[0]["text"])
+    #return "assistant"
+    return agent_class
 
 
 def reset_memory(state: State) -> State:
@@ -76,7 +79,7 @@ roles = {
 }
 
 
-def initialize_agent(model: ModelType = ModelType.GPT, role: str = "default"):
+def initialize_agent_supervisor(model: ModelType = ModelType.GPT, role: str = "default"):
     agent_llm = ChatOpenAI(model="gpt-4.1-mini", temperature=1)
     team_llm = ChatOpenAI(model="gpt-4.1-nano", temperature=0.7)
 
@@ -141,7 +144,58 @@ def initialize_agent(model: ModelType = ModelType.GPT, role: str = "default"):
     builder.add_edge(START, "fetch_user_info")
     builder.add_conditional_edges(
         "fetch_user_info",
-        reset_memory_condition,
+        route_request,
+    )
+    builder.add_edge("reset_memory", END)
+
+    #builder.add_conditional_edges(
+    #    "assistant",
+    #    tools_condition,
+    #)
+    #builder.add_edge("tools", "assistant")
+
+    # The checkpointer lets the graph persist its state
+    # this is a complete memory for the entire graph.
+    memory = MemorySaver()
+    return builder.compile(name="interleasing_qa_agent", checkpointer=memory)
+
+def initialize_agent(model: ModelType = ModelType.GPT, role: str = "default"):
+    agent_llm = ChatOpenAI(model="gpt-4.1-mini", temperature=1)
+    team_llm = ChatOpenAI(model="gpt-4.1-nano", temperature=0.7)
+
+    #llm_role, assistant_tools_role = assistant_factory(model, role)
+    #llm_default, assistant_tools_default = assistant_factory(model, "default")
+    search_kb = get_search_tool()
+    search_tools = [
+        search_kb
+    ]
+    with open("prompts/supervisor_prompt.txt", encoding="utf-8") as f:
+        sv_prompt = f.read()
+    with open("prompts/working_prompt_sales.txt", encoding="utf-8") as f:
+        sm_prompt = f.read()
+    with open("prompts/working_prompt.txt", encoding="utf-8") as f:
+        sd_prompt = f.read()
+    with open("prompts/working_prompt_employee.txt", encoding="utf-8") as f:
+        default_prompt = f.read()
+
+    sd_agent = create_react_agent(model=team_llm, tools=search_tools, prompt=sd_prompt, name="assistant_sd", debug=config.DEBUG_WORKFLOW)
+    sm_agent = create_react_agent(model=team_llm, tools=search_tools, prompt=sm_prompt, name="assistant_sm", debug=config.DEBUG_WORKFLOW)
+    default_agent = create_react_agent(model=team_llm, tools=search_tools, prompt=default_prompt, name="assistant_default", debug=config.DEBUG_WORKFLOW)
+    
+
+    builder = StateGraph(State, config_schema=ConfigSchema)
+    # Define nodes: these do the work
+    builder.add_node("fetch_user_info", user_info)
+    builder.add_node("reset_memory", reset_memory)
+
+    builder.add_node("sm_agent", sm_agent)
+    builder.add_node("sd_agent", sd_agent)
+    builder.add_node("default_agent", default_agent)
+
+    builder.add_edge(START, "fetch_user_info")
+    builder.add_conditional_edges(
+        "fetch_user_info",
+        route_request,
     )
     builder.add_edge("reset_memory", END)
 
@@ -158,7 +212,7 @@ def initialize_agent(model: ModelType = ModelType.GPT, role: str = "default"):
 
 
 if __name__ == "__main__":
-    assistant_graph = initialize_agent(model=ModelType.LOCAL)
+    assistant_graph = initialize_agent(model=ModelType.GPT)
 
     #show_graph(assistant_graph)
     from langchain_core.messages import HumanMessage
