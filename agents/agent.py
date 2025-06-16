@@ -165,13 +165,7 @@ def initialize_agent_supervisor(model: ModelType = ModelType.GPT, role: str = "d
 
 def initialize_agent(model: ModelType = ModelType.GPT, role: str = "default"):
     #team_llm = ChatOpenAI(model=config.TEAM_GPT_MODEL, temperature=0.7)
-    #team_llm = ChatOpenAI(model=config.TEAM_GPT_MODEL, temperature=0.7)
-    team_llm = GigaChat(
-        credentials=config.GIGA_CHAT_AUTH, 
-        model="GigaChat-Pro",
-        verify_ssl_certs=False,
-        temperature=1,
-        scope = config.GIGA_CHAT_SCOPE)
+    team_llm = ChatOpenAI(model=config.TEAM_GPT_MODEL, temperature=1)
     
     search_kb = get_search_tool()
     search_tools = [
