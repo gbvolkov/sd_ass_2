@@ -41,7 +41,6 @@ def route_request(state: State) -> str:
     #return "assistant"
     return agent_class
 
-
 def reset_memory(state: State) -> State:
     """
     Delete every message currently stored in the thread’s state.
