@@ -14,9 +14,10 @@ from langgraph.prebuilt import tools_condition
 from langchain_openai import ChatOpenAI
 from langchain_mistralai import ChatMistralAI
 from langchain_gigachat import GigaChat
-from agents.assistants.yandex_tools.yandex_tooling import ChatYandexGPTWithTools as ChatYandexGPTTolls
+from agents.assistants.yandex_tools.yandex_tooling import ChatYandexGPTWithTools as ChatYandexGPT
 
 from langchain_core.messages.modifier import RemoveMessage
+#from langchain_core.messages import HumanMessage, AIMessage
 
 from langgraph_supervisor import create_supervisor
 from langgraph.prebuilt.chat_agent_executor import create_react_agent
@@ -37,7 +38,11 @@ logger = logging.getLogger(__name__)
 def route_request(state: State) -> str:
     if state["messages"][-1].content[0].get("type") == "reset":
         return "reset_memory"
-    agent_class = classify_request(state["messages"][-1].content[0]["text"])
+    queries = []
+    for message in state["messages"]:
+        if message.type == "human":
+            queries.append(message.content[0]["text"])
+    agent_class = classify_request(";".join(queries))
     #return "assistant"
     return agent_class
 
@@ -159,8 +164,15 @@ def initialize_agent_supervisor(model: ModelType = ModelType.GPT, role: str = "d
     return builder.compile(name="interleasing_qa_agent", checkpointer=memory)
 
 def initialize_agent(model: ModelType = ModelType.GPT, role: str = "default"):
-    team_llm = ChatOpenAI(model="gpt-4.1-nano", temperature=0.7)
-
+    #team_llm = ChatOpenAI(model=config.TEAM_GPT_MODEL, temperature=0.7)
+    #team_llm = ChatOpenAI(model=config.TEAM_GPT_MODEL, temperature=0.7)
+    team_llm = GigaChat(
+        credentials=config.GIGA_CHAT_AUTH, 
+        model="GigaChat-Pro",
+        verify_ssl_certs=False,
+        temperature=1,
+        scope = config.GIGA_CHAT_SCOPE)
+    
     search_kb = get_search_tool()
     search_tools = [
         search_kb
