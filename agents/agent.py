@@ -23,7 +23,7 @@ from langgraph_supervisor import create_supervisor
 from langgraph.prebuilt.chat_agent_executor import create_react_agent
 
 
-from classifier import classify_request
+from agents.classifier import classify_request, summarise_request
 from agents.state.state import State, ConfigSchema
 from agents.assistants.assistant import Assistant, assistant_factory
 from agents.utils import create_tool_node_with_fallback, show_graph, _print_event, _print_response
@@ -42,8 +42,8 @@ def route_request(state: State) -> str:
     for message in state["messages"]:
         if message.type == "human":
             queries.append(message.content[0]["text"])
-    agent_class = classify_request(";".join(queries))
-    #return "assistant"
+    summary_query = summarise_request(";".join(queries))
+    agent_class = classify_request(summary_query)
     return agent_class
 
 def reset_memory(state: State) -> State:
@@ -171,8 +171,6 @@ def initialize_agent(model: ModelType = ModelType.GPT, role: str = "default"):
     search_tools = [
         search_kb
     ]
-    with open("prompts/supervisor_prompt.txt", encoding="utf-8") as f:
-        sv_prompt = f.read()
     with open("prompts/working_prompt_sales.txt", encoding="utf-8") as f:
         sm_prompt = f.read()
     with open("prompts/working_prompt.txt", encoding="utf-8") as f:
