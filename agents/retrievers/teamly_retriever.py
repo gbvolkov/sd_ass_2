@@ -108,8 +108,7 @@ def _get_article_text(base_url: str, article_info: Dict) -> str:
 
     # The root is usually a {"type": "doc", ...}
     walk(doc)
-    result = "".join(pieces)[:128000]
-    return "".join(pieces)
+    return "".join(pieces)[:128000]
 
 
 # ---------------------------------------------------------------------------
