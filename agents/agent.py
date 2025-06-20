@@ -44,6 +44,8 @@ def route_request(state: State) -> str:
             queries.append(message.content[0]["text"])
     summary_query = summarise_request(";".join(queries))
     agent_class = classify_request(summary_query)
+    #state["last_question"] = summary_query
+    #state["agent_class"] = agent_class
     return agent_class
 
 def reset_memory(state: State) -> State:
@@ -86,6 +88,7 @@ roles = {
 def initialize_agent_supervisor(model: ModelType = ModelType.GPT, role: str = "default"):
     agent_llm = ChatOpenAI(model="gpt-4.1-mini", temperature=1)
     team_llm = ChatOpenAI(model="gpt-4.1-nano", temperature=0.7)
+    memory = MemorySaver()
 
     #llm_role, assistant_tools_role = assistant_factory(model, role)
     #llm_default, assistant_tools_default = assistant_factory(model, "default")
@@ -102,13 +105,31 @@ def initialize_agent_supervisor(model: ModelType = ModelType.GPT, role: str = "d
     with open("prompts/working_prompt_employee.txt", encoding="utf-8") as f:
         default_prompt = f.read()
 
-    sd_agent = create_react_agent(model=team_llm, tools=search_tools, prompt=sd_prompt, name="assistant_sd", debug=config.DEBUG_WORKFLOW)
-    sm_agent = create_react_agent(model=team_llm, tools=search_tools, prompt=sm_prompt, name="assistant_sm", debug=config.DEBUG_WORKFLOW)
-    default_agent = create_react_agent(model=team_llm, tools=search_tools, prompt=default_prompt, name="assistant_default", debug=config.DEBUG_WORKFLOW)
+    sd_agent =      create_react_agent(
+        model=team_llm, 
+        tools=search_tools, 
+        prompt=sd_prompt, 
+        name="assistant_sd", 
+        #state_schema = State, 
+        checkpointer=memory, 
+        debug=config.DEBUG_WORKFLOW)
+    sm_agent =      create_react_agent(
+        model=team_llm, 
+        tools=search_tools, 
+        prompt=sm_prompt, 
+        name="assistant_sm", 
+        #state_schema = State, 
+        checkpointer=memory, 
+        debug=config.DEBUG_WORKFLOW)
+    default_agent = create_react_agent(
+        model=team_llm, 
+        tools=search_tools, 
+        prompt=default_prompt, 
+        name="assistant_default", 
+        #state_schema = State, 
+        checkpointer=memory, 
+        debug=config.DEBUG_WORKFLOW)
     
-    #sd_agent, sd_agent_name = get_role_agent(model=ModelType.YA, role="service_desk")
-    #sm_agent, sm_agent_name = get_role_agent(model=ModelType.YA, role="sales_manager")
-    #default_agent, default_agent_name = get_role_agent(model=ModelType.YA, role="default")
 
     ho_sd = create_handoff_tool_no_history(
         agent_name = sd_agent.name, 
@@ -160,11 +181,12 @@ def initialize_agent_supervisor(model: ModelType = ModelType.GPT, role: str = "d
 
     # The checkpointer lets the graph persist its state
     # this is a complete memory for the entire graph.
-    memory = MemorySaver()
     return builder.compile(name="interleasing_qa_agent", checkpointer=memory)
 
 def initialize_agent(model: ModelType = ModelType.GPT, role: str = "default"):
-    #team_llm = ChatOpenAI(model=config.TEAM_GPT_MODEL, temperature=0.7)
+    # The checkpointer lets the graph persist its state
+    # this is a complete memory for the entire graph.
+    memory = MemorySaver()
     team_llm = ChatOpenAI(model=config.TEAM_GPT_MODEL, temperature=1)
     
     search_kb = get_search_tool()
@@ -178,9 +200,30 @@ def initialize_agent(model: ModelType = ModelType.GPT, role: str = "default"):
     with open("prompts/working_prompt_employee.txt", encoding="utf-8") as f:
         default_prompt = f.read()
 
-    sd_agent = create_react_agent(model=team_llm, tools=search_tools, prompt=sd_prompt, name="assistant_sd", debug=config.DEBUG_WORKFLOW)
-    sm_agent = create_react_agent(model=team_llm, tools=search_tools, prompt=sm_prompt, name="assistant_sm", debug=config.DEBUG_WORKFLOW)
-    default_agent = create_react_agent(model=team_llm, tools=search_tools, prompt=default_prompt, name="assistant_default", debug=config.DEBUG_WORKFLOW)
+    sd_agent =      create_react_agent(
+        model=team_llm, 
+        tools=search_tools, 
+        prompt=sd_prompt, 
+        name="assistant_sd", 
+        #state_schema = State, 
+        checkpointer=memory, 
+        debug=config.DEBUG_WORKFLOW)
+    sm_agent =      create_react_agent(
+        model=team_llm, 
+        tools=search_tools, 
+        prompt=sm_prompt, 
+        name="assistant_sm", 
+        #state_schema = State, 
+        checkpointer=memory, 
+        debug=config.DEBUG_WORKFLOW)
+    default_agent = create_react_agent(
+        model=team_llm, 
+        tools=search_tools, 
+        prompt=default_prompt, 
+        name="assistant_default", 
+        #state_schema = State, 
+        checkpointer=memory, 
+        debug=config.DEBUG_WORKFLOW)
     
 
     builder = StateGraph(State, config_schema=ConfigSchema)
@@ -200,9 +243,6 @@ def initialize_agent(model: ModelType = ModelType.GPT, role: str = "default"):
     )
     builder.add_edge("reset_memory", END)
 
-    # The checkpointer lets the graph persist its state
-    # this is a complete memory for the entire graph.
-    memory = MemorySaver()
     return builder.compile(name="interleasing_qa_agent", checkpointer=memory)
 
 

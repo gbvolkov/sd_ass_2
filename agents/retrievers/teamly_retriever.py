@@ -72,7 +72,7 @@ def _get_article_text(base_url: str, article_info: Dict) -> str:
                         pieces.append(f" {url}")
                 elif mark.get("type") in {"media"}:
                     url = mark.get("attrs", {}).get("src")
-                    if url and isinstance(url, str):
+                    if url and isinstance(url, str) and not url.startswith("data:"):
                         if not url.startswith("https:"):
                             url = base_url + url
                         pieces.append(f" {url}")
@@ -92,7 +92,7 @@ def _get_article_text(base_url: str, article_info: Dict) -> str:
         # ---  dedicated url / link nodes ------------------------------------
         elif ntype in {"media"}:
             url = node.get("attrs", {}).get("src") or node.get("attrs", {})
-            if url and isinstance(url, str):
+            if url and isinstance(url, str) and not url.startswith("data:"):
                 if not url.startswith("https:") and not url.startswith("mailto:"):
                     url = base_url + url
                 pieces.append(f" {url}")
@@ -108,6 +108,7 @@ def _get_article_text(base_url: str, article_info: Dict) -> str:
 
     # The root is usually a {"type": "doc", ...}
     walk(doc)
+    result = "".join(pieces)[:128000]
     return "".join(pieces)
 
 

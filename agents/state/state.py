@@ -18,6 +18,8 @@ def add_messages_no_img(msgs1: Messages, msgs2: Messages) -> Messages:
 class State(TypedDict):
     messages: Annotated[list[AnyMessage], add_messages_no_img]
     user_info: str
+    last_question: str
+    agent_class: str
 
 class ConfigSchema(TypedDict):
     user_id: Optional[str]
