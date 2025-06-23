@@ -34,5 +34,7 @@ telebot
 telegramify-markdown
 telegramify-markdown[mermaid]
 
+google-auth-httplib2
+google-api-python-client
 
 pandas
