@@ -26,14 +26,13 @@ class GoogleSheetsManager:
 
     def append_row(self, values, sheet_range='feedback'):
         sheet = self.service.spreadsheets().values()
-        result = sheet.append(  
+        return sheet.append(
             spreadsheetId=self.spreadsheet_id,
             range=sheet_range,
             valueInputOption='USER_ENTERED',
             insertDataOption='INSERT_ROWS',
-            body={'values': [values]}
+            body={'values': [values]},
         ).execute()
-        return result
     
     def process_answers(self, processor, answers_range='answers', status='1', processed_range='moderation'):
         # Get the values from the 'answers' sheet.
@@ -49,12 +48,12 @@ class GoogleSheetsManager:
         headers = values[0]
         try:
             status_index = headers.index('status')
-        except ValueError:
-            raise Exception("Status column not found in headers")
+        except ValueError as e:
+            raise Exception("Status column not found in headers") from e
 
         # Get the sheetId for the 'answers' sheet (needed for deletion).
         answers_sheet_id = self.get_sheet_id(answers_range)
-        
+
         # deleted_count keeps track of how many rows have been removed already,
         # which is needed to compute the effective row index for deletion.
         deleted_count = 0
@@ -66,12 +65,12 @@ class GoogleSheetsManager:
                 record = dict(zip(headers, row))
                 question = record.get("user_question", "NA")
                 answer = record.get("user_answer", "NA")
-                
+
                 if processor(question, answer):
                     cprocessed = cprocessed + 1
                     # Update the row's status to '2' (as a string to be consistent)
                     row[status_index] = '2'
-                    
+
                     # Append the updated row to the 'processed' sheet.
                     # (This uses the append method so the row is added to the bottom.)
                     self.append_row(row, sheet_range=processed_range)

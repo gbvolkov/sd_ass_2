@@ -1,3 +1,4 @@
+from datetime import datetime
 from http.client import HTTPException
 import logging
 logging.basicConfig(level=logging.INFO)
@@ -6,7 +7,9 @@ import config
 
 import telebot
 from telebot import types
+from telebot.types import InlineKeyboardMarkup, InlineKeyboardButton
 from telebot.apihelper import ApiTelegramException
+
 from langchain_core.messages import HumanMessage
 
 import time, uuid, json, os, base64
@@ -22,11 +25,26 @@ from thread_settings import ThreadSettings
 from agents.utils import _send_response, summarise_image, image_to_uri, ModelType
 
 from palimpsest.logger_factory import setup_logging
+from store_managers.google_sheets_man import GoogleSheetsManager
 
 def run_bot():
 
     bot = telebot.TeleBot(config.TELEGRAM_BOT_TOKEN)
     chats = defaultdict(ThreadSettings)
+
+    try:
+        sheets_manager = GoogleSheetsManager(config.GOOGLE_SHEETS_CRED, config.FEEDBACK_SHEET_ID)
+    except Exception as e:
+        logging.error(f"Error initializing Google Sheets manager: {e}")
+        sheets_manager = None
+
+    # Add this function to create the rating keyboard
+    def create_rating_keyboard():
+        keyboard = InlineKeyboardMarkup()
+        keyboard.add(InlineKeyboardButton("Промазал:(", callback_data="rate_1"))
+        #keyboard.add(InlineKeyboardButton("Похоже на правду.", callback_data="rate_2"))
+        keyboard.add(InlineKeyboardButton("В точку! Спасибо!", callback_data="rate_3"))
+        return keyboard
 
     @bot.message_handler(commands=['start'])
     def send_welcome(message):
@@ -174,6 +192,52 @@ def run_bot():
         for event in events:
             bot.send_chat_action(chat_id=chat_id, action="typing", timeout=30)
             _send_response(event, _printed, thread=chats[chat_id], bot=bot, usr_msg=message)
+        
+        bot.send_message(chat_id, 'Пожалуйста, оцените ответ.', reply_markup=create_rating_keyboard())
+
+    @bot.callback_query_handler(func=lambda call: call.data.startswith("rate_"))
+    def callback_rating(call):
+        rating = call.data.split("_")[1]
+        chat_id = call.message.chat.id
+        user_id = call.from_user.id
+        username = call.from_user.username
+
+        # Retrieve the user's question and bot's response
+        user_question = chats[chat_id].question
+        bot_response = chats[chat_id].answer
+        model = chats[chat_id].model.value
+        context = chats[chat_id].context
+
+        # Get current timestamp
+        timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+
+        # Store the data in Google Sheets
+        if sheets_manager:
+            sheets_manager.append_row([
+                timestamp,
+                username,
+                user_question,
+                bot_response,
+                rating,
+                model,
+                context[:32000]
+            ])
+        
+        # Here you can add code to store the rating in a database or file
+        # For now, we'll just log it
+        logging.info(f"User {username} (ID: {user_id}) rated message {call.message.message_id} as {rating}")
+
+        # Provide feedback to the user
+        rating_text = {
+            "1": "Unreliable",
+            "2": "Somewhat Helpful",
+            "3": "Very Helpful"
+        }
+        bot.answer_callback_query(call.id, f"Вы поставили рейтинг {rating_text[rating]}. Спасибо за оценку!")
+
+        # Remove the rating keyboard after rating
+        bot.edit_message_reply_markup(chat_id=chat_id, message_id=call.message.message_id, reply_markup=None)
+
 
     while True:
         try:
