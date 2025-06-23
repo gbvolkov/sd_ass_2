@@ -89,19 +89,23 @@ def send_text_element(chat_id, element_content, bot, usr_msg = None):
             bot.send_message(chat_id, chunk)
 
 
-def _send_response(event: dict, _printed: set, thread, bot, usr_msg=None, max_length=0):
+def _send_response(event: dict, _printed: set, thread, bot, usr_msg=None, max_length=0) -> str:
     if current_state := event.get("dialog_state"):
         print("Currently in: ", current_state[-1])
-    if message := event.get("messages"):
-        if isinstance(message, list):
-            message = message[-1]
-        if message.id not in _printed:
-            if message.type == "ai" and message.content.strip() != "":
-                msg_repr = message.content.strip()
-                if max_length > 0 and len(msg_repr) > max_length:
-                    msg_repr = f"{msg_repr[:max_length]} ... (truncated)"
-                send_text_element(thread.chat_id, msg_repr, bot, usr_msg)
-            _printed.add(message.id)
+    if not (message := event.get("messages")):
+        return ""
+    answers = []
+    if isinstance(message, list):
+        message = message[-1]
+    if message.id not in _printed:
+        if message.type == "ai" and message.content.strip() != "":
+            msg_repr = message.content.strip()
+            if max_length > 0 and len(msg_repr) > max_length:
+                msg_repr = f"{msg_repr[:max_length]} ... (truncated)"
+            answers.append(msg_repr)
+            send_text_element(thread.chat_id, msg_repr, bot, usr_msg)
+        _printed.add(message.id)
+    return "\n".join(answers)
 
 def _send_response_full(event: dict, _printed: set, thread, bot, usr_msg=None, max_length=0):
     if current_state := event.get("dialog_state"):

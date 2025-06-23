@@ -189,10 +189,16 @@ def run_bot():
             {"messages": [messages]}, chats[chat_id].get_config(), stream_mode="values"
         )
         _printed = set()
+        answers = []
         for event in events:
             bot.send_chat_action(chat_id=chat_id, action="typing", timeout=30)
-            _send_response(event, _printed, thread=chats[chat_id], bot=bot, usr_msg=message)
-        
+            answer = _send_response(event, _printed, thread=chats[chat_id], bot=bot, usr_msg=message)
+            if answer and answer != "":
+                answers.append(answer)
+        chats[chat_id].question = query
+        chats[chat_id].answer = "\n".join(answers)
+
+
         bot.send_message(chat_id, 'Пожалуйста, оцените ответ.', reply_markup=create_rating_keyboard())
 
     @bot.callback_query_handler(func=lambda call: call.data.startswith("rate_"))
@@ -248,9 +254,9 @@ def run_bot():
         except HTTPException as e:
             logging.error(f"HTTP error: {e}")
             time.sleep(5)
-        #except Exception as e:
-        #    logging.error(f"Unexpected error in bot polling: {e}")
-        #    time.sleep(5)
+        except Exception as e:
+            logging.error(f"Unexpected error in bot polling: {e}")
+            time.sleep(5)
 
 
 if __name__ == '__main__':
