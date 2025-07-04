@@ -2,6 +2,7 @@ from typing import Annotated, Optional
 from typing_extensions import TypedDict
 
 from langgraph.graph.message import AnyMessage, add_messages, Messages
+from langgraph.managed import IsLastStep, RemainingSteps
 
 from agents.utils import ModelType
 
@@ -20,6 +21,11 @@ class State(TypedDict):
     user_info: str
     last_question: str
     agent_class: str
+    verification_result: str
+    verification_reason: str
+
+    is_last_step: IsLastStep
+    remaining_steps: RemainingSteps
 
 class ConfigSchema(TypedDict):
     user_id: Optional[str]

@@ -21,9 +21,10 @@ from langchain_core.messages.modifier import RemoveMessage
 
 from langgraph_supervisor import create_supervisor
 from langgraph.prebuilt.chat_agent_executor import create_react_agent
-
+from langchain_community.tools import DuckDuckGoSearchRun
 
 from agents.classifier import classify_request, summarise_request
+from agents.validate_answer import vadildate_AI_answer, CheckResult
 from agents.state.state import State, ConfigSchema
 from agents.assistants.assistant import Assistant, assistant_factory
 from agents.utils import create_tool_node_with_fallback, show_graph, _print_event, _print_response
@@ -129,7 +130,6 @@ def initialize_agent_supervisor(model: ModelType = ModelType.GPT, role: str = "d
         #state_schema = State, 
         checkpointer=memory, 
         debug=config.DEBUG_WORKFLOW)
-    
 
     ho_sd = create_handoff_tool_no_history(
         agent_name = sd_agent.name, 
@@ -153,7 +153,8 @@ def initialize_agent_supervisor(model: ModelType = ModelType.GPT, role: str = "d
         add_handoff_back_messages=True,
         output_mode="last_message",
         parallel_tool_calls=True,
-        supervisor_name="interleasing_qa"
+        supervisor_name="interleasing_qa",
+        state_schema=State
     ).compile(name="interleasing_qa", debug = config.DEBUG_WORKFLOW)
 
     builder = StateGraph(State, config_schema=ConfigSchema)
@@ -193,6 +194,9 @@ def initialize_agent(model: ModelType = ModelType.GPT, role: str = "default"):
     search_tools = [
         search_kb
     ]
+    web_tools = [
+        DuckDuckGoSearchRun()
+    ]
     with open("prompts/working_prompt_sales.txt", encoding="utf-8") as f:
         sm_prompt = f.read()
     with open("prompts/working_prompt.txt", encoding="utf-8") as f:
@@ -200,12 +204,45 @@ def initialize_agent(model: ModelType = ModelType.GPT, role: str = "default"):
     with open("prompts/working_prompt_employee.txt", encoding="utf-8") as f:
         default_prompt = f.read()
 
+    web_search_agent =      create_react_agent(
+        model=team_llm, 
+        tools=web_tools, 
+        prompt=sd_prompt, 
+        name="search_web_sd", 
+        #state_schema = State, 
+        checkpointer=memory, 
+        debug=config.DEBUG_WORKFLOW)
+
+    def validate_answer(state: State):
+        queries = []
+        messages = state["messages"]
+        last_message = messages[-1]
+        if last_message.type != "ai" or len(last_message.tool_calls) > 0:
+            return state
+        ai_answer = "No asnwer."
+        for message in messages:
+            if message.type == "human":
+                queries.append(message.content[0]["text"])
+        
+        ai_answer = last_message.content
+
+        summary_query = summarise_request(";".join(queries))
+        result = vadildate_AI_answer(summary_query, ai_answer)
+        if result.result == "NO":
+            search_result = web_search_agent.invoke(summary_query)
+            web_answer = search_result.messages[-1].content
+            return {"verification_result": result.result,
+                    "verification_reason": result.reason}
+        else:
+            return state
+
     sd_agent =      create_react_agent(
         model=team_llm, 
         tools=search_tools, 
         prompt=sd_prompt, 
         name="assistant_sd", 
-        #state_schema = State, 
+        #post_model_hook=validate_answer,
+        state_schema = State, 
         checkpointer=memory, 
         debug=config.DEBUG_WORKFLOW)
     sm_agent =      create_react_agent(
@@ -213,15 +250,15 @@ def initialize_agent(model: ModelType = ModelType.GPT, role: str = "default"):
         tools=search_tools, 
         prompt=sm_prompt, 
         name="assistant_sm", 
-        #state_schema = State, 
+        state_schema = State, 
         checkpointer=memory, 
         debug=config.DEBUG_WORKFLOW)
     default_agent = create_react_agent(
         model=team_llm, 
         tools=search_tools, 
         prompt=default_prompt, 
-        name="assistant_default", 
-        #state_schema = State, 
+        name="search_web_agent", 
+        state_schema = State, 
         checkpointer=memory, 
         debug=config.DEBUG_WORKFLOW)
     

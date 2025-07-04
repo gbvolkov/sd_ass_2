@@ -6,6 +6,7 @@ import config
 
 from langchain_openai import ChatOpenAI
 from langchain_community.chat_models import ChatYandexGPT
+from langchain_core.prompts import ChatPromptTemplate
 
 model_uri=f'cls://{config.YA_FOLDER_ID}/yandexgpt-lite/latest'
 header = {
@@ -51,13 +52,14 @@ summariser_llm = ChatYandexGPT(
     temperature=0
     )
 
+
 def summarise_request(request: str, maxlen: int = 256) -> str:
     if len(request) <= maxlen:
         return request
-    prompt = "You have as an input series of user's requests to knowledgebase.\n" \
-        "Please prepare ONE final request, which will request all information user needs to retrieve.\n" \
-        "Always answer in Russian.\n" \
-        f"UserRequest: {request}."
+    prompt = ("You have as an input series of user's requests to knowledgebase.\n" 
+        "Please prepare ONE final request, which will request all information user needs to retrieve.\n" 
+        "Always answer in Russian.\n" 
+        f"UserRequest: {request}.")
     result = summariser_llm.invoke(prompt)
     return result.content
 
