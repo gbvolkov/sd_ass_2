@@ -17,11 +17,13 @@ from langchain_gigachat import GigaChat
 from agents.assistants.yandex_tools.yandex_tooling import ChatYandexGPTWithTools as ChatYandexGPT
 
 from langchain_core.messages.modifier import RemoveMessage
-#from langchain_core.messages import HumanMessage, AIMessage
+from langchain_core.messages import HumanMessage, AIMessage
 
 from langgraph_supervisor import create_supervisor
 from langgraph.prebuilt.chat_agent_executor import create_react_agent
 from langchain_community.tools import DuckDuckGoSearchRun
+
+from agents.tools.yandex_search import YandexSearchTool
 
 from agents.classifier import classify_request, summarise_request
 from agents.validate_answer import vadildate_AI_answer, CheckResult
@@ -193,8 +195,16 @@ def initialize_agent(model: ModelType = ModelType.GPT, role: str = "default"):
     search_tools = [
         search_kb
     ]
+    
+    yandex_tool = YandexSearchTool(
+        api_key=config.YA_API_KEY,
+        folder_id=config.YA_FOLDER_ID,
+        max_results=3
+    )
+    
     web_tools = [
-        DuckDuckGoSearchRun()
+        yandex_tool,
+        #DuckDuckGoSearchRun()
     ]
     with open("prompts/working_prompt_sales.txt", encoding="utf-8") as f:
         sm_prompt = f.read()
@@ -202,11 +212,14 @@ def initialize_agent(model: ModelType = ModelType.GPT, role: str = "default"):
         sd_prompt = f.read()
     with open("prompts/working_prompt_employee.txt", encoding="utf-8") as f:
         default_prompt = f.read()
+    with open("prompts/search_web_prompt.txt", encoding="utf-8") as f:
+        search_web_prompt = f.read()
+        
 
     web_search_agent =      create_react_agent(
         model=team_llm, 
         tools=web_tools, 
-        prompt=sd_prompt, 
+        prompt=search_web_prompt, 
         name="search_web_sd", 
         #state_schema = State, 
         checkpointer=memory, 
@@ -228,9 +241,11 @@ def initialize_agent(model: ModelType = ModelType.GPT, role: str = "default"):
         summary_query = summarise_request(";".join(queries))
         result = vadildate_AI_answer(summary_query, ai_answer)
         if result.result == "NO":
-            search_result = web_search_agent.invoke(summary_query)
-            web_answer = search_result.messages[-1].content
-            return {"verification_result": result.result,
+            search_result = web_search_agent.invoke({"messages": [HumanMessage(content=[{"type": "text", "text": summary_query}])]})
+            web_answer = search_result.get("messages", [])[-1].content + "\nОтвет получен из поисковой системы Яндекс."
+            new_messages = messages[:-1] + [AIMessage(content=web_answer)]
+            return {"messages": new_messages,
+                    "verification_result": result.result,
                     "verification_reason": result.reason}
         else:
             return state
@@ -240,7 +255,7 @@ def initialize_agent(model: ModelType = ModelType.GPT, role: str = "default"):
         tools=search_tools, 
         prompt=sd_prompt, 
         name="assistant_sd", 
-        #post_model_hook=validate_answer,
+        post_model_hook=validate_answer,
         state_schema = State, 
         checkpointer=memory, 
         debug=config.DEBUG_WORKFLOW)
