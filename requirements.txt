@@ -4,6 +4,8 @@ notion-client
 
 openai-whisper
 
+rank_llm
+
 langgraph
 langgraph_supervisor
 

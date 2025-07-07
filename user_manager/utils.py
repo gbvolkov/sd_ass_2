@@ -20,10 +20,7 @@ def get_data_from_sheet(sheet_id: str, sheet_name: str) -> pd.DataFrame:
 
     url = f"https://docs.google.com/spreadsheets/d/{sheet_id}/gviz/tq?tqx=out:csv&sheet={sheet_name}"
 
-    # Read the CSV data directly into a pandas DataFrame
-    df = pd.read_csv(url)
-
-    return df
+    return pd.read_csv(url)
 
 class ModelType(Enum):
     GPT = ("gpt", "GPT")
@@ -55,28 +52,27 @@ def format_df(df: pd.DataFrame, max_rows: Optional[int] = None, max_cols: Option
         df = df.head(max_rows)
     if max_cols is not None and len(df.columns) > max_cols:
         df = df.iloc[:, :max_cols]
-    
+
     # Convert DataFrame to string
     df_string = df.to_string(index = False)
 
     # Split the string into lines
     lines = df_string.split('\n')
-    
+
     # Find the maximum length of any line
     max_length = max(len(line) for line in lines)
-    
+
     # Create a top and bottom border
     border = '+' + '-' * (max_length + 2) + '+'
-    
+
     # Add padding to each line and create the formatted string
     formatted_lines = [border]
-    for line in lines:
-        formatted_lines.append(f"| {line:<{max_length}} |")
+    formatted_lines.extend(f"| {line:<{max_length}} |" for line in lines)
     formatted_lines.append(border)
-    
+
     # Join the lines
     result = '\n'.join(formatted_lines)
-    
+
     return f"```\n{result}\n```"
 
 
@@ -102,21 +98,21 @@ class UserManager:
         """
         # Ensure the username starts with '@'
         if not username.startswith('@'):
-            username = '@' + username
-        
+            username = f'@{username}'
+
         # Find the user in the DataFrame
         user_row = self.users[self.users['user'] == username]
-        
+
         if user_row.empty:
             return []
-        
+
         # Get the models string
         models_str = user_row['models'].iloc[0].strip()
-        
+
         # If models is '*', return all ModelTypes
         if models_str == '*':
             return [model.value for model in ModelType]
-        
+
         # Otherwise, split the string and convert to ModelTypes
         model_strings = models_str.split(',')
         models = []
@@ -128,30 +124,30 @@ class UserManager:
                 models.append(model.value)
             except StopIteration:
                 logging.warning(f"Warning: Unknown model type '{model_str}' for user {username}")
-        
+
         return models
     
     def is_allowed(self, username: str) -> bool:
         if not username.startswith('@'):
-            username = '@' + username
+            username = f'@{username}'
         return not self.users[self.users['user'] == username].empty
 
     def is_model_allowed(self, username: str, model: ModelType) -> bool:
         if not username.startswith('@'):
-            username = '@' + username
+            username = f'@{username}'
         if self.is_allowed(username):
             return model.value in self.get_user_models(username)
         return False
 
     def is_admin(self, username: str) -> bool:
         if not username.startswith('@'):
-            username = '@' + username
+            username = f'@{username}'
         if not self.users[self.users['user'] == username].empty:
             return self.users[self.users['user'] == username]['admin'].iloc[0].strip().lower() == 'yes'
         
     def get_role(self, username: str) -> bool:
         if not username.startswith('@'):
-            username = '@' + username
+            username = f'@{username}'
         if not self.users[self.users['user'] == username].empty:
             return self.users[self.users['user'] == username]['role'].iloc[0].strip().lower()
 

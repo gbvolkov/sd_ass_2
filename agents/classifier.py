@@ -11,7 +11,7 @@ from langchain_core.prompts import ChatPromptTemplate
 model_uri=f'cls://{config.YA_FOLDER_ID}/yandexgpt-lite/latest'
 header = {
     "Content-Type": "application/json",
-    "Authorization": "Api-Key " + config.YA_API_KEY
+    "Authorization": f"Api-Key {config.YA_API_KEY}",
 }
 api_url = "https://llm.api.cloud.yandex.net/foundationModels/v1/fewShotTextClassification"
 
@@ -79,7 +79,7 @@ def classify_request(request: str) -> str:
         predictions.sort(key = lambda x: x["confidence"], reverse=True)
         defined_class = predictions[0]["label"]
         return lables[defined_class]
-    except:
+    except Exception:
         return "default_agent"
 
 if __name__ == "__main__":

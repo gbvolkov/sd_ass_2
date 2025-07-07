@@ -40,14 +40,13 @@ def route_request(state: State) -> str:
     if state["messages"][-1].content[0].get("type") == "reset":
         return "reset_memory"
     queries = []
-    for message in state["messages"]:
-        if message.type == "human":
-            queries.append(message.content[0]["text"])
+    queries.extend(
+        message.content[0]["text"]
+        for message in state["messages"]
+        if message.type == "human"
+    )
     summary_query = summarise_request(";".join(queries))
-    agent_class = classify_request(summary_query)
-    #state["last_question"] = summary_query
-    #state["agent_class"] = agent_class
-    return agent_class
+    return classify_request(summary_query)
 
 def reset_memory(state: State) -> State:
     """

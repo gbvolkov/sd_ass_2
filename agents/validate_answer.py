@@ -18,8 +18,7 @@ check_llm = llm.with_structured_output(CheckResult)
 check_chain = prompt | check_llm
 
 def vadildate_AI_answer(question: str, answer: str) -> CheckResult:
-    result = check_chain.invoke({"question": question, "answer": answer})
-    return result
+    return check_chain.invoke({"question": question, "answer": answer})
 
 
 if __name__ == "__main__":

@@ -26,14 +26,13 @@ class GoogleSheetsManager:
 
     def append_row(self, values, sheet_range='feedback'):
         sheet = self.service.spreadsheets().values()
-        result =  sheet.append(
+        return sheet.append(
             spreadsheetId=self.spreadsheet_id,
             range=sheet_range,
             valueInputOption='USER_ENTERED',
             insertDataOption='INSERT_ROWS',
             body={'values': [values]},
         ).execute()
-        return result
     
     def process_answers(self, processor, answers_range='answers', status='1', processed_range='moderation'):
         # Get the values from the 'answers' sheet.

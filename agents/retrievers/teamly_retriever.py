@@ -330,8 +330,7 @@ class TeamlyRetriever(BaseRetriever):
             }
         }
         article_info = self._post("/api/v1/wiki/ql/article", payload)
-        text = _get_article_text(self.base_url, article_info)
-        return text
+        return _get_article_text(self.base_url, article_info)
 
 
     def _to_document(self, hit: dict) -> Document:
