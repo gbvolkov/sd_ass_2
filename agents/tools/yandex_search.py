@@ -78,7 +78,7 @@ class YandexSearchTool(BaseTool):
                 {
                     "title": _normalize(title),
                     "href": href,
-                    "body": f"{_normalize(body)[:self.max_size]}\n\nСсылка на статью: {href}",
+                    "body": f"{_normalize(body)[:self.max_size]}\n\nСсылка на статью: {href}\n========= END OF DOCUMENT ============\n",
                 }
             )
 
