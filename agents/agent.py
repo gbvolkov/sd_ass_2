@@ -199,8 +199,7 @@ def initialize_agent(model: ModelType = ModelType.GPT, role: str = "default"):
     yandex_tool = YandexSearchTool(
         api_key=config.YA_API_KEY,
         folder_id=config.YA_FOLDER_ID,
-        max_results=3,
-        max_size=4096
+        max_results=3
     )
     
     web_tools = [

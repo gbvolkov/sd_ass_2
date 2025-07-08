@@ -4,7 +4,7 @@ from langchain_core.tools import BaseTool
 from pydantic import BaseModel, Field
 import base64
 from xml.etree import ElementTree as ET
-from bs4 import BeautifulSoup
+import trafilatura
 from duckduckgo_search.utils import _normalize, _normalize_url
 
 
@@ -24,7 +24,7 @@ class YandexSearchTool(BaseTool):
     api_key: str
     folder_id: str
     max_results: int = 5
-    max_size: int = 2048
+    max_size: int = 16384
 
     def _run(self, query: str) -> str:
         headers = {
@@ -52,10 +52,8 @@ class YandexSearchTool(BaseTool):
             return f"Yandex Search failed: {e}"
 
     def _extract_url_content(self, url: str) -> str:
-        resp = requests.get(url)
-        resp.raise_for_status()
-        soup = BeautifulSoup(resp.text, "html.parser")
-        return soup.get_text(separator="\n", strip=True)
+        html = trafilatura.fetch_url(url)
+        return trafilatura.extract(html)
 
     def _get_data(self, endpoint, headers, payload):
         response = requests.post(endpoint, headers=headers, json=payload)
