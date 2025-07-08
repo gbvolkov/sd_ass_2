@@ -222,7 +222,7 @@ def initialize_agent(model: ModelType = ModelType.GPT, role: str = "default"):
             with open("prompts/search_web_prompt_sales.txt", encoding="utf-8") as f:
                 search_web_prompt = f.read()
         else:
-            with open("prompts/search_web_prompt.txt", encoding="utf-8") as f:
+            with open("prompts/search_web_prompt_employee.txt", encoding="utf-8") as f:
                 search_web_prompt = f.read()
 
         web_search_agent =      create_react_agent(
@@ -251,7 +251,7 @@ def initialize_agent(model: ModelType = ModelType.GPT, role: str = "default"):
             result = vadildate_AI_answer(summary_query, ai_answer)
             if result.result == "NO":
                 search_result = web_search_agent.invoke({"messages": [HumanMessage(content=[{"type": "text", "text": summary_query}])]})
-                web_answer = search_result.get("messages", [])[-1].content + "\nОтвет получен из поисковой системы Яндекс."
+                web_answer = "⚡** Ответ получен из поисковой системы Яндекс **.\n\n" + search_result.get("messages", [])[-1].content
                 new_messages = messages[:-1] + [AIMessage(content=web_answer)]
                 return {"messages": new_messages,
                         "verification_result": result.result,
@@ -283,7 +283,7 @@ def initialize_agent(model: ModelType = ModelType.GPT, role: str = "default"):
         model=team_llm, 
         tools=search_tools, 
         prompt=default_prompt, 
-        name="search_web_agent", 
+        name="assistant_default", 
         post_model_hook=get_validator("default_agent"),
         state_schema = State, 
         checkpointer=memory, 
