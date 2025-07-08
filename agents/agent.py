@@ -212,50 +212,61 @@ def initialize_agent(model: ModelType = ModelType.GPT, role: str = "default"):
         sd_prompt = f.read()
     with open("prompts/working_prompt_employee.txt", encoding="utf-8") as f:
         default_prompt = f.read()
-    with open("prompts/search_web_prompt.txt", encoding="utf-8") as f:
-        search_web_prompt = f.read()
         
+    def get_validator(agent: str):
 
-    web_search_agent =      create_react_agent(
-        model=team_llm, 
-        tools=web_tools, 
-        prompt=search_web_prompt, 
-        name="search_web_sd", 
-        #state_schema = State, 
-        checkpointer=memory, 
-        debug=config.DEBUG_WORKFLOW)
-
-    def validate_answer(state: State):
-        queries = []
-        messages = state["messages"]
-        last_message = messages[-1]
-        if last_message.type != "ai" or len(last_message.tool_calls) > 0:
-            return state
-        ai_answer = "No asnwer."
-        for message in messages:
-            if message.type == "human":
-                queries.append(message.content[0]["text"])
-        
-        ai_answer = last_message.content
-
-        summary_query = summarise_request(";".join(queries))
-        result = vadildate_AI_answer(summary_query, ai_answer)
-        if result.result == "NO":
-            search_result = web_search_agent.invoke({"messages": [HumanMessage(content=[{"type": "text", "text": summary_query}])]})
-            web_answer = search_result.get("messages", [])[-1].content + "\nОтвет получен из поисковой системы Яндекс."
-            new_messages = messages[:-1] + [AIMessage(content=web_answer)]
-            return {"messages": new_messages,
-                    "verification_result": result.result,
-                    "verification_reason": result.reason}
+        if agent == "sd_agent":
+            with open("prompts/search_web_prompt.txt", encoding="utf-8") as f:
+                search_web_prompt = f.read()
+        elif agent == "sm_agent":
+            with open("prompts/search_web_prompt_sales.txt", encoding="utf-8") as f:
+                search_web_prompt = f.read()
         else:
-            return state
+            with open("prompts/search_web_prompt.txt", encoding="utf-8") as f:
+                search_web_prompt = f.read()
+
+        web_search_agent =      create_react_agent(
+            model=team_llm, 
+            tools=web_tools, 
+            prompt=search_web_prompt, 
+            name="search_web_sd", 
+            #state_schema = State, 
+            checkpointer=memory, 
+            debug=config.DEBUG_WORKFLOW)
+
+        def validate_answer(state: State):
+            queries = []
+            messages = state["messages"]
+            last_message = messages[-1]
+            if last_message.type != "ai" or len(last_message.tool_calls) > 0:
+                return state
+            ai_answer = "No asnwer."
+            for message in messages:
+                if message.type == "human":
+                    queries.append(message.content[0]["text"])
+            
+            ai_answer = last_message.content
+
+            summary_query = summarise_request(";".join(queries))
+            result = vadildate_AI_answer(summary_query, ai_answer)
+            if result.result == "NO":
+                search_result = web_search_agent.invoke({"messages": [HumanMessage(content=[{"type": "text", "text": summary_query}])]})
+                web_answer = search_result.get("messages", [])[-1].content + "\nОтвет получен из поисковой системы Яндекс."
+                new_messages = messages[:-1] + [AIMessage(content=web_answer)]
+                return {"messages": new_messages,
+                        "verification_result": result.result,
+                        "verification_reason": result.reason}
+            else:
+                return state
+
+        return validate_answer
 
     sd_agent =      create_react_agent(
         model=team_llm, 
         tools=search_tools, 
         prompt=sd_prompt, 
         name="assistant_sd", 
-        post_model_hook=validate_answer,
+        post_model_hook=get_validator("sd_agent"),
         state_schema = State, 
         checkpointer=memory, 
         debug=config.DEBUG_WORKFLOW)
@@ -264,6 +275,7 @@ def initialize_agent(model: ModelType = ModelType.GPT, role: str = "default"):
         tools=search_tools, 
         prompt=sm_prompt, 
         name="assistant_sm", 
+        post_model_hook=get_validator("sm_agent"),
         state_schema = State, 
         checkpointer=memory, 
         debug=config.DEBUG_WORKFLOW)
@@ -272,6 +284,7 @@ def initialize_agent(model: ModelType = ModelType.GPT, role: str = "default"):
         tools=search_tools, 
         prompt=default_prompt, 
         name="search_web_agent", 
+        post_model_hook=get_validator("default_agent"),
         state_schema = State, 
         checkpointer=memory, 
         debug=config.DEBUG_WORKFLOW)
