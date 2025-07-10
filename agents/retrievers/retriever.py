@@ -119,7 +119,7 @@ def get_retriever_teamly():
     return search
 
 
-def get_retroever_faiss():
+def get_retriever_faiss():
     MAX_RETRIEVALS = 3
 
     vector_store_path = config.ASSISTANT_INDEX_FOLDER
@@ -156,7 +156,7 @@ def get_retriever():
     retriever_type = config.RETRIEVER_TYPE
     if retriever_type == "teamly":
         return get_retriever_teamly()
-    return get_retroever_faiss()
+    return get_retriever_faiss()
 
 search = get_retriever()
 

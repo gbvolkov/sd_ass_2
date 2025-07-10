@@ -59,7 +59,7 @@ if __name__ == "__main__":
     model = AutoModel.from_pretrained("intfloat/multilingual-e5-large")
 
     # Пример вопроса и длинного текста, разбитого на отрывки (passages)
-    question = "Какие должностные олбязанности стюартов?"
+    question = "Какие должностные обязанности стюартов?"
     passages = chunk_text(text)
     #passages = [
     #    "Взрослой женщине в возрасте от 19 до 70 лет рекомендуется употреблять 46 грамм белка в день согласно CDC.",
