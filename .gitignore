@@ -5,5 +5,7 @@ keys
 logs
 models
 gv.env
+.env
+.langgraph_api
 auth.json
 nohup.out

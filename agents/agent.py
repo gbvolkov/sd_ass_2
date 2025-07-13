@@ -36,6 +36,16 @@ from agents.tools.supervisor_tools import create_handoff_tool_no_history
 from agents.retrievers.retriever import get_search_tool
 
 import logging
+
+from prompts.prompts import (
+    default_prompt, 
+    sm_prompt, 
+    sd_prompt, 
+    sv_prompt, 
+    sd_agent_web_prompt, 
+    sm_agent_web_prompt, 
+    default_search_web_prompt)
+
 logger = logging.getLogger(__name__)
 
 def route_request(state: State) -> str:
@@ -98,14 +108,6 @@ def initialize_agent_supervisor(model: ModelType = ModelType.GPT, role: str = "d
     search_tools = [
         search_kb
     ]
-    with open("prompts/supervisor_prompt.txt", encoding="utf-8") as f:
-        sv_prompt = f.read()
-    with open("prompts/working_prompt_sales.txt", encoding="utf-8") as f:
-        sm_prompt = f.read()
-    with open("prompts/working_prompt.txt", encoding="utf-8") as f:
-        sd_prompt = f.read()
-    with open("prompts/working_prompt_employee.txt", encoding="utf-8") as f:
-        default_prompt = f.read()
 
     sd_agent =      create_react_agent(
         model=team_llm, 
@@ -172,6 +174,12 @@ def initialize_agent_supervisor(model: ModelType = ModelType.GPT, role: str = "d
     builder.add_conditional_edges(
         "fetch_user_info",
         route_request,
+        {
+            "reset_memory": "reset_memory",
+            "sm_agent": "sm_agent",
+            "sd_agent": "sd_agent",
+            "default_agent": "default_agent",
+        }
     )
     builder.add_edge("reset_memory", END)
 
@@ -185,10 +193,10 @@ def initialize_agent_supervisor(model: ModelType = ModelType.GPT, role: str = "d
     # this is a complete memory for the entire graph.
     return builder.compile(name="interleasing_qa_agent", checkpointer=memory)
 
-def initialize_agent(model: ModelType = ModelType.GPT, role: str = "default"):
+def initialize_agent(model: ModelType = ModelType.GPT, role: str = "default", use_platform_store: bool = False):
     # The checkpointer lets the graph persist its state
     # this is a complete memory for the entire graph.
-    memory = MemorySaver()
+    memory = None if use_platform_store else MemorySaver()
     team_llm = ChatOpenAI(model=config.TEAM_GPT_MODEL, temperature=1)
     
     search_kb = get_search_tool()
@@ -206,24 +214,15 @@ def initialize_agent(model: ModelType = ModelType.GPT, role: str = "default"):
         yandex_tool,
         #DuckDuckGoSearchRun()
     ]
-    with open("prompts/working_prompt_sales.txt", encoding="utf-8") as f:
-        sm_prompt = f.read()
-    with open("prompts/working_prompt.txt", encoding="utf-8") as f:
-        sd_prompt = f.read()
-    with open("prompts/working_prompt_employee.txt", encoding="utf-8") as f:
-        default_prompt = f.read()
         
     def get_validator(agent: str):
 
         if agent == "sd_agent":
-            with open("prompts/search_web_prompt.txt", encoding="utf-8") as f:
-                search_web_prompt = f.read()
+            search_web_prompt = sd_agent_web_prompt
         elif agent == "sm_agent":
-            with open("prompts/search_web_prompt_sales.txt", encoding="utf-8") as f:
-                search_web_prompt = f.read()
+            search_web_prompt = sm_agent_web_prompt
         else:
-            with open("prompts/search_web_prompt_employee.txt", encoding="utf-8") as f:
-                search_web_prompt = f.read()
+            search_web_prompt = default_search_web_prompt
 
         web_search_agent =      create_react_agent(
             model=team_llm, 
@@ -304,6 +303,12 @@ def initialize_agent(model: ModelType = ModelType.GPT, role: str = "default"):
     builder.add_conditional_edges(
         "fetch_user_info",
         route_request,
+        {
+            "reset_memory": "reset_memory",
+            "sm_agent": "sm_agent",
+            "sd_agent": "sd_agent",
+            "default_agent": "default_agent",
+        }
     )
     builder.add_edge("reset_memory", END)
 

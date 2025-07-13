@@ -30,6 +30,7 @@ sentencepiece
 accelerate
 grpcio
 yandexcloud
+trafilatura
 
 palimpsest@git+https://github.com/gbvolkov/PalimpsestLib.git
 
