@@ -106,6 +106,7 @@ def get_retriever_teamly():
 
     teamly_retriever = TeamlyRetriever("./auth.json", k=40)
     device = "cuda" if torch.cuda.is_available() else "cpu"
+    #device = "cpu"
     reranker_model = HuggingFaceCrossEncoder(model_name=config.RERANKING_MODEL, model_kwargs = {'trust_remote_code': True, "device": device})
     reranker = CrossEncoderReranker(model=reranker_model, top_n=MAX_RETRIEVALS)
     retriever = TeamlyContextualCompressionRetriever(
@@ -114,6 +115,7 @@ def get_retriever_teamly():
 
     def search(query: str) -> List[Document]:
         result = retriever.invoke(query, search_kwargs={"k": MAX_RETRIEVALS})
+        #torch.cuda.empty_cache()
         return result
 
     return search
