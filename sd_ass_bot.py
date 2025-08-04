@@ -27,6 +27,8 @@ from agents.utils import _send_response, summarise_image, image_to_uri, ModelTyp
 from palimpsest.logger_factory import setup_logging
 from store_managers.google_sheets_man import GoogleSheetsManager
 
+from agents.retrievers.retriever import refresh_indexes
+
 def run_bot():
 
     bot = telebot.TeleBot(config.TELEGRAM_BOT_TOKEN)
@@ -82,36 +84,14 @@ def run_bot():
         assistant.invoke(
             {"messages": [HumanMessage(content=[{"type": "reset", "text": "RESET"}])]}, chats[chat_id].get_config(), stream_mode="values"
         )
-        bot.send_message(user_id, "Память бота очищена.")
-    
-    """
-    @bot.message_handler(commands=['role'])
-    def set_role(message):
-        user_id = message.from_user.username
+        bot.send_message(chat_id, "Память бота очищена.")
+
+    @bot.message_handler(commands=['reload'])
+    def reload_kb(message):
         chat_id = message.chat.id
-        role = message.any_text[len("/role"):].strip()
-        #role = user_man.get_role(user_id)
+        refresh_indexes()
+        bot.send_message(chat_id, "База знаний обновлена.")
 
-        chats[chat_id] = ThreadSettings(user_id=user_id, chat_id=chat_id, role=role)
-
-        #resetting memory
-        assistant = chats[chat_id].assistant
-        assistant.invoke(
-            {"messages": [HumanMessage(content=[{"type": "reset", "text": "RESET"}])]}, chats[chat_id].get_config(), stream_mode="values"
-        )
-        
-        query = "Привет! Представься пожалуйста и расскажи о себе."
-        messages = HumanMessage(
-            content=[{"type": "text", "text": query}]
-        )
-        events = assistant.stream(
-            {"messages": [messages]}, chats[chat_id].get_config(), stream_mode="values"
-        )
-        _printed = set()
-        for event in events:
-            bot.send_chat_action(chat_id=chat_id, action="typing", timeout=30)
-            _send_response(event, _printed, thread=chats[chat_id], bot=bot)
-    """
     @bot.message_handler(content_types=['text', 'voice', 'photo', 'document'])
     def handle_message(message):
         chat_id = message.chat.id
@@ -134,12 +114,12 @@ def run_bot():
                 os.remove(ogg_file_path)
 
                 if not query:
-                    bot.send_message(user_id, "Не удалось распознать голосовое сообщение. Пожалуйста, отправьте текст вручную или попробуйте снова.")
+                    bot.send_message(chat_id, "Не удалось распознать голосовое сообщение. Пожалуйста, отправьте текст вручную или попробуйте снова.")
                     return
                 logging.info(f"Распознанный текст:\n{query}")
             except Exception as e:
                 logging.error(f"Error processing voice message: {str(e)}")
-                bot.send_message(user_id, "Не удалось распознать голосовое сообщение. Пожалуйста, отправьте текст вручную или попробуйте снова.")
+                bot.send_message(chat_id, "Не удалось распознать голосовое сообщение. Пожалуйста, отправьте текст вручную или попробуйте снова.")
                 return
         elif message.content_type in ('photo', 'document'):
 
@@ -168,7 +148,7 @@ def run_bot():
                 #bot.send_message(chat_id, f"🖼️  Вот краткое описание изображения:\n\n{summary}")
             except Exception as e:
                 logging.exception("Error processing image")
-                bot.send_message(user_id,
+                bot.send_message(chat_id,
                                 "Не удалось обработать изображение. "
                                 "Попробуйте отправить другое или повторить позже.")
         else:
