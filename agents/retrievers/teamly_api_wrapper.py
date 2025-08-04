@@ -13,7 +13,9 @@ import config
 from langchain.schema import Document
 
 from agents.retrievers.utils.load_table import get_data_from_json
-from agents.retrievers.utils.build_documents import get_documents
+from agents.retrievers.utils.build_documents import get_documents_for_sd_qa, get_documents_for_sd_tickets
+
+from abc import ABC, abstractmethod
 
 # ---------------------------------------------------------------------------
 # Helper decorator – unchanged except for typing tweaks
@@ -116,7 +118,7 @@ def _get_article_text(base_url: str, article_info: Dict) -> str:
 # Main retriever
 # ---------------------------------------------------------------------------
 
-class TeamlyAPIWrapper(BaseModel):
+class TeamlyAPIWrapper(BaseModel, ABC):
     """
     Teamly API Wrapper.
 
@@ -139,6 +141,8 @@ class TeamlyAPIWrapper(BaseModel):
     auth_code: str = ""
     redirect_uri: str = ""
     sd_documents: List[Document] = []
+    articles_json_path: str = ""
+    rename_map: dict = {}
     
     # ---------------------------------------------------------------------
     # Construction / auth helpers
@@ -173,10 +177,14 @@ class TeamlyAPIWrapper(BaseModel):
             "Authorization": f"Bearer {self.auth_code}",
         }
 
-        self._load_sd_articles_documents()
+        self._load_sd_documents()
 
-    def _load_sd_articles_documents(self):
-        with open ("./data/sd_articles.json", "r") as f:
+    @abstractmethod
+    def get_documents(self, df: pd.DataFrame) -> list[Document]:
+        pass
+
+    def _load_sd_documents(self):
+        with open (self.articles_json_path, "r") as f:
             articles = json.load(f)
         df = pd.DataFrame()
         for article_id in articles["articles"]:
@@ -185,10 +193,9 @@ class TeamlyAPIWrapper(BaseModel):
             article_title = article_info["title"]
             raw_doc = article_info["editorContentObject"]["content"]
             doc = json.loads(raw_doc)
-            arcticle_df = get_data_from_json(doc, space_id, article_id, article_title)
+            arcticle_df = get_data_from_json(doc, space_id, article_id, article_title, self.rename_map)
             df = pd.concat([df, arcticle_df], ignore_index=True)
-        self.sd_documents = get_documents(df)
-
+        self.sd_documents = self.get_documents(df)
 
     def get_documents_from_teamly_search(self, query: str) -> List[Document]:
         """Synchronous retrieval used by most LC components."""
@@ -360,6 +367,32 @@ class TeamlyAPIWrapper(BaseModel):
                 "source": "semantic"
             },
         )
+
+class TeamlyAPIWrapper_SD_QA(TeamlyAPIWrapper):
+    rename_map: dict = {
+        "ИС": "it_system",
+        "Описание проблемы": "problem_description",
+        "Решение": "problem_solution",
+        # Add others if you need them:
+        "Пример Тикетов": "ticket_example"
+    }
+    articles_json_path: str = "./data/sd_articles.json"
+    def get_documents(self, df: pd.DataFrame) -> list[Document]:
+        return get_documents_for_sd_qa(df)
+
+
+class TeamlyAPIWrapper_SD_Tickets(TeamlyAPIWrapper):
+    rename_map: dict = {
+        "Номер": "ticket_no",
+        "Тема": "topic",
+        "Дата регистрации": "ticket_dt",
+        "Критерий ошибки": "ticket_type",
+        "Описание текст": "problem",
+        "Описание решения": "solution"
+    }
+    articles_json_path: str = "./data/sd_tickets.json"
+    def get_documents(self, df: pd.DataFrame) -> list[Document]:
+        return get_documents_for_sd_tickets(df)
 
 
 if __name__ == "__main__":

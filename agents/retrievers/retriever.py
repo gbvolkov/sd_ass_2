@@ -27,22 +27,14 @@ from langchain_community.vectorstores import FAISS
 from palimpsest import Palimpsest
 from agents.retrievers.teamly_retriever import (
     TeamlyRetriever,
+    TeamlyRetriever_Tickets,
     TeamlyContextualCompressionRetriever
 )
 import config
 
 # Global instances and refreshable Teamly Retriever for hot index updates
 _teamly_retriever_instance: Optional[TeamlyRetriever] = None
-_teamly_compression_retriever_instance: Optional[TeamlyContextualCompressionRetriever] = None
-class TeamlyRetrieverRefreshable(TeamlyRetriever):
-    """Extends TeamlyRetriever with a hot-refresh mechanism for its indexes."""
-    def refresh(self) -> None:
-        """Rebuild and atomically swap the FAISS vector index and BM25 index from source documents."""
-        # Reload source documents (e.g., new or updated knowledge base articles)
-        self._load_sd_articles_documents()
-        # Rebuild the indexes using the updated documents
-        self.load_sd_articles_index()
-        # The idx_vectors and idx_bm25 attributes are now refreshed
+#_teamly_compression_retriever_instance: Optional[TeamlyContextualCompressionRetriever] = None
 
 def load_vectorstore(file_path: str, embedding_model_name: str) -> FAISS:
     if not os.path.exists(file_path):
@@ -71,39 +63,11 @@ def get_retriever_multi():
         return result
     return search
 
-def get_retriever_plain():
-    # Load document store from persisted storage
-    # loading list of problem numbers as ids
-    vector_store_path = config.ASSISTANT_INDEX_FOLDER
-    vectorstore = load_vectorstore(vector_store_path, config.EMBEDDING_MODEL)
-    reranker_model = HuggingFaceCrossEncoder(model_name=config.RERANKING_MODEL)
-    reranker = CrossEncoderReranker(model=reranker_model, top_n=3)
-    with open(f'{vector_store_path}/docstore.pkl', 'rb') as file:
-        documents = pickle.load(file)
-    doc_ids = [doc.metadata.get('problem_number', '') for doc in documents]
-    store = InMemoryByteStore()
-    id_key = "problem_number"
-    MAX_RETRIEVALS = 5
-    multi_retriever = MultiVectorRetriever(
-        vectorstore=vectorstore,
-        byte_store=store,
-        id_key=id_key,
-        search_kwargs={"k": MAX_RETRIEVALS},
-    )
-    multi_retriever.docstore.mset(list(zip(doc_ids, documents)))
-    retriever = ContextualCompressionRetriever(
-        base_compressor=reranker, base_retriever=multi_retriever
-    )
-    def search(query: str) -> List[Document]:
-        result = retriever.invoke(query, search_kwargs={"k": MAX_RETRIEVALS})
-        return result
-    return search
-
 def get_retriever_teamly():
     MAX_RETRIEVALS = 3
-    global _teamly_retriever_instance, _teamly_compression_retriever_instance
+    global _teamly_retriever_instance#, _teamly_compression_retriever_instance
     # Initialize Teamly retriever with refresh support
-    _teamly_retriever_instance = TeamlyRetrieverRefreshable("./auth.json", k=40)
+    _teamly_retriever_instance = TeamlyRetriever("./auth.json", k=40)
     device = "cuda" if torch.cuda.is_available() else "cpu"
     # device = "cpu"
     reranker_model = HuggingFaceCrossEncoder(
@@ -111,11 +75,11 @@ def get_retriever_teamly():
         model_kwargs={'trust_remote_code': True, "device": device}
     )
     reranker = CrossEncoderReranker(model=reranker_model, top_n=MAX_RETRIEVALS)
-    _teamly_compression_retriever_instance = TeamlyContextualCompressionRetriever(
+    retriever = TeamlyContextualCompressionRetriever(
         base_compressor=reranker, base_retriever=_teamly_retriever_instance
     )
     def search(query: str) -> List[Document]:
-        result = _teamly_compression_retriever_instance.invoke(query, search_kwargs={"k": MAX_RETRIEVALS})
+        result = retriever.invoke(query, search_kwargs={"k": MAX_RETRIEVALS})
         # torch.cuda.empty_cache()
         return result
     return search
@@ -159,6 +123,7 @@ def get_retriever():
 # Initialize the search function with the selected retrieverx
 search = get_retriever()
 
+
 def refresh_indexes():
     """Refresh the indexes of the active retriever (e.g., rebuild Teamly FAISS and BM25 indexes)."""
     if config.RETRIEVER_TYPE == "teamly" and _teamly_retriever_instance:
@@ -182,6 +147,28 @@ def get_search_tool(anonymizer: Palimpsest = None):
         else:
             return "No matching information found."
     return search_kb
+
+def get_tickets_search_tool(anonymizer: Palimpsest = None):
+    MAX_RETRIEVALS = 3
+    retriever = TeamlyRetriever_Tickets("./auth_tickets.json", k=MAX_RETRIEVALS)
+    
+    @tool
+    def search_tickets(query: str) -> str:
+        """Retrieves from tickets knowledgebase context suitable for the query. Shall be always used when user asks question.
+        Args:
+            query: a query to knowledgebase which helps answer user's question
+        Returns:
+            Context from knowledgebase suitable for the query.
+        """
+        found_docs = retriever.invoke(query)
+        if found_docs:
+            result = "\n\n".join([doc.page_content for doc in found_docs[:30]])
+            if anonymizer:
+                result = anonymizer.anonimize(result)
+            return result
+        else:
+            return "No matching information found."
+    return search_tickets
 
 if __name__ == '__main__':
     search_kb = get_search_tool()

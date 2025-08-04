@@ -2,7 +2,7 @@ import json
 from pathlib import Path
 import pandas as pd
 
-def get_data_from_json(data: str, space_id: str, article_id: str, article_title: str):
+def get_data_from_json(data: str, space_id: str, article_id: str, article_title: str, rename_map: dict):
     # ---------- helpers ----------
     def extract_text(node):
         """Recursively pull plain text from TipTap/ProseMirror nodes."""
@@ -61,14 +61,6 @@ def get_data_from_json(data: str, space_id: str, article_id: str, article_title:
 
     df = pd.DataFrame(records)
 
-    # Optional: map Russian headers to English keys you use downstream
-    rename_map = {
-        "ИС": "it_system",
-        "Описание проблемы": "problem_description",
-        "Решение": "problem_solution",
-        # Add others if you need them:
-        "Пример Тикетов": "ticket_example"
-    }
     df = df.rename(columns=rename_map)
     df[["space_id", "article_id", "article_title"]] = (space_id, article_id, article_title)
     #df["problem_description"] = df["problem_description"] + "\n\nСсылка на статью:https://kb.ileasing.ru/space/{space_id}/article/{article_id}"

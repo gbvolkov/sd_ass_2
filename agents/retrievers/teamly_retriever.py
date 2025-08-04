@@ -16,7 +16,7 @@ from langchain_core.callbacks import (
 )
 
 from agents.retrievers.utils.build_index import get_retrievers
-from agents.retrievers.teamly_api_wrapper import TeamlyAPIWrapper
+from agents.retrievers.teamly_api_wrapper import TeamlyAPIWrapper_SD_QA, TeamlyAPIWrapper_SD_Tickets
 
 import config
 
@@ -24,7 +24,99 @@ import config
 # Main retriever
 # ---------------------------------------------------------------------------
 
-class TeamlyRetriever(BaseRetriever, TeamlyAPIWrapper):
+class TeamlyRetriever_Tickets(BaseRetriever, TeamlyAPIWrapper_SD_Tickets):
+    """
+    LangChain-compatible wrapper around Teamly semantic search.
+
+    Required auth/connection data are read from *auth_data_store* – the same
+    JSON structure you used before:
+
+    ```json
+    {
+      "base_url":      "...",
+      "client_id":     "...",
+      "client_secret": "...",
+      "auth_code":     "...",   # either refresh-token or one-shot code
+      "redirect_uri":  "..."
+    }
+    ```
+    """
+    k: int = 5
+    idx_vectors: FAISS = None
+    idx_bm25: BM25Retriever = None
+    
+    # pydantic-style model config so arbitrary attrs are allowed
+    class Config:
+        arbitrary_types_allowed = True
+        underscore_attrs_are_private = True
+
+    # ---------------------------------------------------------------------
+    # Construction / auth helpers
+    # ---------------------------------------------------------------------
+
+    def __init__(self, auth_data_store: str, *, k: int = 10, **kwargs) -> None:
+        """
+        Parameters
+        ----------
+        auth_data_store:
+            Path to the JSON file that stores credentials and the last
+            (refresh) token. The file will be updated in-place whenever a new
+            token is issued.
+        k:
+            How many documents to return for every query.
+        """
+        super().__init__(auth_data_store = auth_data_store, **kwargs)
+        self.k = k
+
+        #shall be last call in chain, since it uses initialize teamly search params
+        self.load_sd_tickets_index()
+
+    def load_sd_tickets_index(self):
+        (self.idx_vectors, self.idx_bm25) = get_retrievers(self.sd_documents)            
+
+    def _get_documents_from_sd_tables(self, query: str) -> List[Document]:
+        documents = []
+        if self.idx_vectors:
+            v_res = self.idx_vectors.similarity_search(query, k=3)
+            documents.extend(v_res)
+        if self.idx_bm25:
+            bm25_res = self.idx_bm25.invoke(query)[:3]
+            documents.extend(bm25_res)
+        return documents
+
+    def refresh(self) -> None:
+        """Rebuild and atomically swap the FAISS vector index and BM25 index from source documents."""
+        # Reload source documents (e.g., new or updated knowledge base articles)
+        self._load_sd_documents()
+        # Rebuild the indexes using the updated documents
+        self.load_sd_tickets_index()
+        # The idx_vectors and idx_bm25 attributes are now refreshed
+
+    # --------------------------------- public LangChain hook -------------
+    def _get_relevant_documents(        # type: ignore[override]
+        self,
+        query: str,
+        *,
+        run_manager: CallbackManagerForRetrieverRun,
+        **kwargs: Any,  # for LC internal plumbing
+    ) -> List[Document]:
+        documents = self._get_documents_from_sd_tables(query = query)
+        return documents
+    
+    async def _aget_relevant_documents(  # type: ignore[override]
+        self,
+        query: str,
+        *,
+        config: Optional[RunnableConfig] = None,
+    ) -> List[Document]:
+        """Naïve asyncio wrapper – uses thread pool because requests is sync."""
+        from asyncio import get_running_loop
+        return await get_running_loop().run_in_executor(
+            None, lambda: self.get_relevant_documents(query=query)
+        )
+
+
+class TeamlyRetriever(BaseRetriever, TeamlyAPIWrapper_SD_QA):
     """
     LangChain-compatible wrapper around Teamly semantic search.
 
@@ -83,7 +175,15 @@ class TeamlyRetriever(BaseRetriever, TeamlyAPIWrapper):
             bm25_res = self.idx_bm25.invoke(query)[:3]
             documents.extend(bm25_res)
         return documents
-        
+
+    def refresh(self) -> None:
+        """Rebuild and atomically swap the FAISS vector index and BM25 index from source documents."""
+        # Reload source documents (e.g., new or updated knowledge base articles)
+        self._load_sd_documents()
+        # Rebuild the indexes using the updated documents
+        self.load_sd_articles_index()
+        # The idx_vectors and idx_bm25 attributes are now refreshed
+
     # --------------------------------- public LangChain hook -------------
     def _get_relevant_documents(        # type: ignore[override]
         self,

@@ -33,7 +33,7 @@ from agents.utils import create_tool_node_with_fallback, show_graph, _print_even
 from agents.user_info import user_info
 from agents.utils import ModelType
 from agents.tools.supervisor_tools import create_handoff_tool_no_history
-from agents.retrievers.retriever import get_search_tool
+from agents.retrievers.retriever import get_search_tool, get_tickets_search_tool
 
 import logging
 
@@ -48,7 +48,7 @@ from prompts.prompts import (
 
 logger = logging.getLogger(__name__)
 
-def route_request(state: State) -> str:
+def route_request(state: State, config: ConfigSchema) -> str:
     if state["messages"][-1].content[0].get("type") == "reset":
         return "reset_memory"
     queries = []
@@ -57,7 +57,14 @@ def route_request(state: State) -> str:
         for message in state["messages"]
         if message.type == "human"
     )
-    summary_query = summarise_request(";".join(queries))
+    role = config["configurable"].get("user_role", "default")
+    if role == "service_desk":
+        role_name = "Сотрудник техподдержки"
+    elif role == "sales_manager":
+        role_name = "Сотрудник отдела продаж"
+    else:
+        role_name = "Сотрудник компании Интерлизинг"
+    summary_query = f"{summarise_request(";".join(queries))}\n\nUser role: {role_name}"
     return classify_request(summary_query)
 
 def reset_memory(state: State) -> State:
@@ -96,103 +103,6 @@ roles = {
     "default": "Provides answers to questions internal rules and features provided to Employees. Consults Interleasing Employees on any HR related questions."
 }
 
-
-def initialize_agent_supervisor(model: ModelType = ModelType.GPT, role: str = "default"):
-    agent_llm = ChatOpenAI(model="gpt-4.1-mini", temperature=1)
-    team_llm = ChatOpenAI(model="gpt-4.1-nano", temperature=0.7)
-    memory = MemorySaver()
-
-    #llm_role, assistant_tools_role = assistant_factory(model, role)
-    #llm_default, assistant_tools_default = assistant_factory(model, "default")
-    search_kb = get_search_tool()
-    search_tools = [
-        search_kb
-    ]
-
-    sd_agent =      create_react_agent(
-        model=team_llm, 
-        tools=search_tools, 
-        prompt=sd_prompt, 
-        name="assistant_sd", 
-        #state_schema = State, 
-        checkpointer=memory, 
-        debug=config.DEBUG_WORKFLOW)
-    sm_agent =      create_react_agent(
-        model=team_llm, 
-        tools=search_tools, 
-        prompt=sm_prompt, 
-        name="assistant_sm", 
-        #state_schema = State, 
-        checkpointer=memory, 
-        debug=config.DEBUG_WORKFLOW)
-    default_agent = create_react_agent(
-        model=team_llm, 
-        tools=search_tools, 
-        prompt=default_prompt, 
-        name="assistant_default", 
-        #state_schema = State, 
-        checkpointer=memory, 
-        debug=config.DEBUG_WORKFLOW)
-
-    ho_sd = create_handoff_tool_no_history(
-        agent_name = sd_agent.name, 
-        agent_purpose=roles["service_desk"])
-    ho_sm = create_handoff_tool_no_history(
-        agent_name = sm_agent.name, 
-        agent_purpose=roles["sales_manager"])
-    ho_default = create_handoff_tool_no_history(
-        agent_name = default_agent.name, 
-        agent_purpose=roles["default"])
-    
-    ho_tools = [ho_sd, ho_sm, ho_default]
-    team = [sd_agent, sm_agent, default_agent]
-
-    supervisor_agent = create_supervisor(
-        model=agent_llm, 
-        agents=team,
-        prompt=sv_prompt,
-        tools=ho_tools,
-        add_handoff_messages=False,
-        add_handoff_back_messages=True,
-        output_mode="last_message",
-        parallel_tool_calls=True,
-        supervisor_name="interleasing_qa",
-        state_schema=State
-    ).compile(name="interleasing_qa", debug = config.DEBUG_WORKFLOW)
-
-    builder = StateGraph(State, config_schema=ConfigSchema)
-    # Define nodes: these do the work
-    builder.add_node("fetch_user_info", user_info)
-    builder.add_node("reset_memory", reset_memory)
-
-    #builder.add_node("assistant", Assistant(llm_role))
-    builder.add_node("assistant", supervisor_agent)
-    #builder.add_node("tools", create_tool_node_with_fallback(assistant_tools_role))
-    # Define edges: these determine how the control flow moves
-
-    builder.add_edge(START, "fetch_user_info")
-    builder.add_conditional_edges(
-        "fetch_user_info",
-        route_request,
-        {
-            "reset_memory": "reset_memory",
-            "sm_agent": "sm_agent",
-            "sd_agent": "sd_agent",
-            "default_agent": "default_agent",
-        }
-    )
-    builder.add_edge("reset_memory", END)
-
-    #builder.add_conditional_edges(
-    #    "assistant",
-    #    tools_condition,
-    #)
-    #builder.add_edge("tools", "assistant")
-
-    # The checkpointer lets the graph persist its state
-    # this is a complete memory for the entire graph.
-    return builder.compile(name="interleasing_qa_agent", checkpointer=memory)
-
 def initialize_agent(model: ModelType = ModelType.GPT, role: str = "default", use_platform_store: bool = False):
     # The checkpointer lets the graph persist its state
     # this is a complete memory for the entire graph.
@@ -200,6 +110,7 @@ def initialize_agent(model: ModelType = ModelType.GPT, role: str = "default", us
     team_llm = ChatOpenAI(model=config.TEAM_GPT_MODEL, temperature=1)
     
     search_kb = get_search_tool()
+    search_tickets = get_tickets_search_tool()
     search_tools = [
         search_kb
     ]
@@ -262,7 +173,7 @@ def initialize_agent(model: ModelType = ModelType.GPT, role: str = "default", us
 
     sd_agent =      create_react_agent(
         model=team_llm, 
-        tools=search_tools, 
+        tools=search_tools + [search_tickets], 
         prompt=sd_prompt, 
         name="assistant_sd", 
         post_model_hook=get_validator("sd_agent"),
