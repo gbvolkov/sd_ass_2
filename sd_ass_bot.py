@@ -29,6 +29,8 @@ from store_managers.google_sheets_man import GoogleSheetsManager
 
 from agents.retrievers.retriever import refresh_indexes
 
+from utils.periodic_task import PeriodicTask
+
 def run_bot():
 
     bot = telebot.TeleBot(config.TELEGRAM_BOT_TOKEN)
@@ -88,98 +90,104 @@ def run_bot():
 
     @bot.message_handler(commands=['reload'])
     def reload_kb(message):
+        kb_update_thread.pause()
         chat_id = message.chat.id
         refresh_indexes()
+        kb_update_thread.resume()
         bot.send_message(chat_id, "База знаний обновлена.")
 
     @bot.message_handler(content_types=['text', 'voice', 'photo', 'document'])
     def handle_message(message):
-        chat_id = message.chat.id
-        user_id = message.from_user.username
-        image_uri = []
-        if chat_id not in chats:
-            chats[chat_id] = ThreadSettings(user_id=user_id, chat_id=chat_id)
-        if message.content_type == 'voice':
-            #bot.send_message(user_id, "Распознаю голосовое сообщение...")
-            try:
-                bot.send_chat_action(chat_id=chat_id, action="upload_voice", timeout=30)
-                file_info = bot.get_file(message.voice.file_id)
-                downloaded_file = bot.download_file(file_info.file_path)
-                ogg_file_path = f"voice_{user_id}_{uuid.uuid4()}.ogg"
-                with open(ogg_file_path, 'wb') as f:
-                    f.write(downloaded_file)
+        kb_update_thread.pause()
+        try:
+            chat_id = message.chat.id
+            user_id = message.from_user.username
+            image_uri = []
+            if chat_id not in chats:
+                chats[chat_id] = ThreadSettings(user_id=user_id, chat_id=chat_id)
+            if message.content_type == 'voice':
+                #bot.send_message(user_id, "Распознаю голосовое сообщение...")
+                try:
+                    bot.send_chat_action(chat_id=chat_id, action="upload_voice", timeout=30)
+                    file_info = bot.get_file(message.voice.file_id)
+                    downloaded_file = bot.download_file(file_info.file_path)
+                    ogg_file_path = f"voice_{user_id}_{uuid.uuid4()}.ogg"
+                    with open(ogg_file_path, 'wb') as f:
+                        f.write(downloaded_file)
 
-                # Передаём путь к OGG-файлу в recognise_text
-                query = recognise_text(ogg_file_path)
-                os.remove(ogg_file_path)
+                    # Передаём путь к OGG-файлу в recognise_text
+                    query = recognise_text(ogg_file_path)
+                    os.remove(ogg_file_path)
 
-                if not query:
+                    if not query:
+                        bot.send_message(chat_id, "Не удалось распознать голосовое сообщение. Пожалуйста, отправьте текст вручную или попробуйте снова.")
+                        return
+                    logging.info(f"Распознанный текст:\n{query}")
+                except Exception as e:
+                    logging.error(f"Error processing voice message: {str(e)}")
                     bot.send_message(chat_id, "Не удалось распознать голосовое сообщение. Пожалуйста, отправьте текст вручную или попробуйте снова.")
                     return
-                logging.info(f"Распознанный текст:\n{query}")
-            except Exception as e:
-                logging.error(f"Error processing voice message: {str(e)}")
-                bot.send_message(chat_id, "Не удалось распознать голосовое сообщение. Пожалуйста, отправьте текст вручную или попробуйте снова.")
-                return
-        elif message.content_type in ('photo', 'document'):
+            elif message.content_type in ('photo', 'document'):
 
-            # Telegram compresses photos; if you need originals tell users to
-            # send the image as a *document*.  We support both here.
-            summary = ""
-            query = message.any_text or ""
-            try:
-                bot.send_chat_action(chat_id=chat_id, action="upload_photo", timeout=30)
-                if message.content_type == 'photo':
-                    # photo array is sorted by size; take the last (largest) thumb
-                    file_id = message.photo[-1].file_id
-                else:
-                    # document
-                    file_id = message.document.file_id
+                # Telegram compresses photos; if you need originals tell users to
+                # send the image as a *document*.  We support both here.
+                summary = ""
+                query = message.any_text or ""
+                try:
+                    bot.send_chat_action(chat_id=chat_id, action="upload_photo", timeout=30)
+                    if message.content_type == 'photo':
+                        # photo array is sorted by size; take the last (largest) thumb
+                        file_id = message.photo[-1].file_id
+                    else:
+                        # document
+                        file_id = message.document.file_id
 
-                file_info = bot.get_file(file_id)
-                img_bytes = bot.download_file(file_info.file_path)
+                    file_info = bot.get_file(file_id)
+                    img_bytes = bot.download_file(file_info.file_path)
 
-                # Convert to Base‑64 data‑URI
-                uri = image_to_uri(base64.b64encode(img_bytes).decode())
-                #bot.send_message(user_id, "Обрабатываю изображение…")
-                summary = summarise_image(uri)
-                query = query + "\n\n" + summary
-                image_uri = [{"type": "image_url", "image_url": {"url": uri}}]
-                #bot.send_message(chat_id, f"🖼️  Вот краткое описание изображения:\n\n{summary}")
-            except Exception as e:
-                logging.exception("Error processing image")
-                bot.send_message(chat_id,
-                                "Не удалось обработать изображение. "
-                                "Попробуйте отправить другое или повторить позже.")
-        else:
-            query = message.text
+                    # Convert to Base‑64 data‑URI
+                    uri = image_to_uri(base64.b64encode(img_bytes).decode())
+                    #bot.send_message(user_id, "Обрабатываю изображение…")
+                    summary = summarise_image(uri)
+                    query = query + "\n\n" + summary
+                    image_uri = [{"type": "image_url", "image_url": {"url": uri}}]
+                    #bot.send_message(chat_id, f"🖼️  Вот краткое описание изображения:\n\n{summary}")
+                except Exception as e:
+                    logging.exception("Error processing image")
+                    bot.send_message(chat_id,
+                                    "Не удалось обработать изображение. "
+                                    "Попробуйте отправить другое или повторить позже.")
+            else:
+                query = message.text
 
 
-        assistant = chats[chat_id].assistant
-        if not message.reply_to_message:
-            assistant.invoke(
-                {"messages": [HumanMessage(content=[{"type": "reset", "text": "RESET"}])]}, chats[chat_id].get_config(), stream_mode="values"
+            assistant = chats[chat_id].assistant
+            if not message.reply_to_message:
+                assistant.invoke(
+                    {"messages": [HumanMessage(content=[{"type": "reset", "text": "RESET"}])]}, chats[chat_id].get_config(), stream_mode="values"
+                )
+
+            messages = HumanMessage(
+                content=[{"type": "text", "text": query}] + image_uri
             )
 
-        messages = HumanMessage(
-            content=[{"type": "text", "text": query}] + image_uri
-        )
+            events = assistant.stream(
+                {"messages": [messages]}, chats[chat_id].get_config(), stream_mode="values"
+            )
+            _printed = set()
+            answers = []
+            for event in events:
+                bot.send_chat_action(chat_id=chat_id, action="typing", timeout=30)
+                answer = _send_response(event, _printed, thread=chats[chat_id], bot=bot, usr_msg=message)
+                if answer and answer != "":
+                    answers.append(answer)
+            chats[chat_id].question = query
+            chats[chat_id].answer = "\n".join(answers)
 
-        events = assistant.stream(
-            {"messages": [messages]}, chats[chat_id].get_config(), stream_mode="values"
-        )
-        _printed = set()
-        answers = []
-        for event in events:
-            bot.send_chat_action(chat_id=chat_id, action="typing", timeout=30)
-            answer = _send_response(event, _printed, thread=chats[chat_id], bot=bot, usr_msg=message)
-            if answer and answer != "":
-                answers.append(answer)
-        chats[chat_id].question = query
-        chats[chat_id].answer = "\n".join(answers)
+            bot.send_message(chat_id, 'Пожалуйста, оцените ответ.', reply_markup=create_rating_keyboard())
+        finally:
+            kb_update_thread.resume()
 
-
-        bot.send_message(chat_id, 'Пожалуйста, оцените ответ.', reply_markup=create_rating_keyboard())
 
     @bot.callback_query_handler(func=lambda call: call.data.startswith("rate_"))
     def callback_rating(call):
@@ -224,6 +232,12 @@ def run_bot():
         # Remove the rating keyboard after rating
         bot.edit_message_reply_markup(chat_id=chat_id, message_id=call.message.message_id, reply_markup=None)
 
+    def periodic_kb_update():
+        refresh_indexes()
+
+    # Start the periodic update thread
+    kb_update_thread = PeriodicTask(periodic_kb_update) #task.start() threading.Thread(target=periodic_kb_update, daemon=True)
+    kb_update_thread.start()
 
     while True:
         try:
@@ -231,12 +245,15 @@ def run_bot():
         except ApiTelegramException as e:
             logging.error(f"Telegram API error: {e}")
             time.sleep(5)
+            kb_update_thread.resume()
         except HTTPException as e:
             logging.error(f"HTTP error: {e}")
             time.sleep(5)
+            kb_update_thread.resume()
         except Exception as e:
             logging.error(f"Unexpected error in bot polling: {e}")
             time.sleep(5)
+            kb_update_thread.resume()
 
 
 if __name__ == '__main__':

@@ -34,6 +34,7 @@ import config
 
 # Global instances and refreshable Teamly Retriever for hot index updates
 _teamly_retriever_instance: Optional[TeamlyRetriever] = None
+_teamly_retriever_tickets_instance : Optional[TeamlyRetriever_Tickets] = None
 #_teamly_compression_retriever_instance: Optional[TeamlyContextualCompressionRetriever] = None
 
 def load_vectorstore(file_path: str, embedding_model_name: str) -> FAISS:
@@ -126,8 +127,11 @@ search = get_retriever()
 
 def refresh_indexes():
     """Refresh the indexes of the active retriever (e.g., rebuild Teamly FAISS and BM25 indexes)."""
-    if config.RETRIEVER_TYPE == "teamly" and _teamly_retriever_instance:
-        _teamly_retriever_instance.refresh()
+    if config.RETRIEVER_TYPE == "teamly":
+        if _teamly_retriever_instance:
+            _teamly_retriever_instance.refresh()
+        if _teamly_retriever_tickets_instance:
+            _teamly_retriever_tickets_instance.refresh()
 
 def get_search_tool(anonymizer: Palimpsest = None):
     @tool
@@ -150,7 +154,9 @@ def get_search_tool(anonymizer: Palimpsest = None):
 
 def get_tickets_search_tool(anonymizer: Palimpsest = None):
     MAX_RETRIEVALS = 3
-    retriever = TeamlyRetriever_Tickets("./auth_tickets.json", k=MAX_RETRIEVALS)
+    global _teamly_retriever_tickets_instance
+
+    _teamly_retriever_tickets_instance = TeamlyRetriever_Tickets("./auth_tickets.json", k=MAX_RETRIEVALS)
     
     @tool
     def search_tickets(query: str) -> str:
@@ -160,7 +166,7 @@ def get_tickets_search_tool(anonymizer: Palimpsest = None):
         Returns:
             Context from knowledgebase suitable for the query.
         """
-        found_docs = retriever.invoke(query)
+        found_docs = _teamly_retriever_tickets_instance.invoke(query)
         if found_docs:
             result = "\n\n".join([doc.page_content for doc in found_docs[:30]])
             if anonymizer:
