@@ -1,0 +1,1 @@
+ps aux | grep sd_ass_bot.py

@@ -1,7 +1,10 @@
 from datetime import datetime
 from http.client import HTTPException
 import logging
-logging.basicConfig(level=logging.INFO)
+logging.basicConfig(level=logging.INFO, format="%(asctime)s — %(levelname)s — %(message)s")
+#from palimpsest.logger_factory import setup_logging
+#setup_logging("sd_assistant", project_console_level=logging.WARNING, other_console_level=logging.WARNING)
+
 
 import config
 
@@ -24,7 +27,6 @@ from thread_settings import ThreadSettings
 
 from agents.utils import _send_response, summarise_image, image_to_uri, ModelType
 
-from palimpsest.logger_factory import setup_logging
 from store_managers.google_sheets_man import GoogleSheetsManager
 
 from agents.retrievers.retriever import refresh_indexes
@@ -257,5 +259,7 @@ def run_bot():
 
 
 if __name__ == '__main__':
-    setup_logging("sd_assistant", project_console_level=logging.WARNING, other_console_level=logging.WARNING)
+    pid = os.getpid()
+    with open(f".process", "w") as f:
+        f.write(f"{pid}")
     run_bot()

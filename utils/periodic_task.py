@@ -10,6 +10,7 @@ class PeriodicTask:
     def __init__(self, job_func):
         self.lock = threading.Lock()
         self.running = True
+        self.paused = False
         self.job = job_func
         
     def periodic_function(self):
@@ -17,7 +18,8 @@ class PeriodicTask:
             # Try to acquire the lock without blocking
             if self.lock.acquire(blocking=False):
                 try:
-                    self.job()
+                    if not self.paused:
+                        self.job()
                 finally:
                     # Always release the lock, even if an exception occurs
                     self.lock.release()
@@ -33,12 +35,12 @@ class PeriodicTask:
 
     def resume(self):
         self.lock.acquire(blocking=True)
-        self.running = True
+        self.paused = False
         self.lock.release()
 
     def pause(self):
         self.lock.acquire(blocking=True)
-        self.running = False
+        self.paused = True
         self.lock.release()
 
     def stop(self):
