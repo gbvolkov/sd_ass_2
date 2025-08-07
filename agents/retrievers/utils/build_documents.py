@@ -27,16 +27,6 @@ def get_documents_for_sd_qa(df: pd.DataFrame) -> list[Document]:
         documents.append(doc)
     return documents
 
-
-    rename_map = {
-        "Номер": "ticket_no",
-        "Тема": "topic",
-        "Дата регистрации": "ticket_dt",
-        "Критерий ошибки": "ticket_type",
-        "Описание текст": "problem",
-        "Описание решения": "solution"
-    }
-
 def get_documents_for_sd_tickets(df: pd.DataFrame) -> list[Document]:
     # Create a list of Documents from each row
     documents = []
@@ -62,6 +52,30 @@ def get_documents_for_sd_tickets(df: pd.DataFrame) -> list[Document]:
                 "article_id": row["article_id"],
                 "article_title": row["article_title"],
                 "source": "sd_tickets_table"
+            }
+        )
+        documents.append(doc)
+    return documents
+
+def get_documents_for_glossary(df: pd.DataFrame) -> list[Document]:
+    # Create a list of Documents from each row
+    documents = []
+    for _, row in df.iterrows():
+        # Combine relevant fields into the page_content for retrieval
+        content = (
+            f"Term: {row['term']}\n"
+            f"Definition: {row['definition']}\n"
+            f"Ссылка на статью:https://kb.ileasing.ru/space/{row['space_id']}/article/{row['article_id']}"
+        )
+        doc = Document(
+            page_content=content,
+            metadata={
+                "term": row["term"],
+                "definition": row["definition"],
+                "space_id": row["space_id"],
+                "article_id": row["article_id"],
+                "article_title": row["article_title"],
+                "source": row["section"]
             }
         )
         documents.append(doc)

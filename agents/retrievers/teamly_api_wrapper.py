@@ -12,8 +12,12 @@ import config
 
 from langchain.schema import Document
 
-from agents.retrievers.utils.load_table import get_data_from_json
-from agents.retrievers.utils.build_documents import get_documents_for_sd_qa, get_documents_for_sd_tickets
+from agents.retrievers.utils.load_table import get_data_from_json, get_glossary_data
+from agents.retrievers.utils.build_documents import (
+    get_documents_for_sd_qa
+    , get_documents_for_sd_tickets
+    , get_documents_for_glossary
+)
 
 from abc import ABC, abstractmethod
 
@@ -143,6 +147,7 @@ class TeamlyAPIWrapper(BaseModel, ABC):
     sd_documents: List[Document] = []
     articles_json_path: str = ""
     rename_map: dict = {}
+    k: int = 40
     
     # ---------------------------------------------------------------------
     # Construction / auth helpers
@@ -183,6 +188,9 @@ class TeamlyAPIWrapper(BaseModel, ABC):
     def get_documents(self, df: pd.DataFrame) -> list[Document]:
         pass
 
+    def parse_json(self, data: str, space_id: str, article_id: str, article_title: str):
+        return get_data_from_json(data, space_id, article_id, article_title, self.rename_map)
+
     def _load_sd_documents(self):
         with open (self.articles_json_path, "r") as f:
             articles = json.load(f)
@@ -193,8 +201,8 @@ class TeamlyAPIWrapper(BaseModel, ABC):
             article_title = article_info["title"]
             raw_doc = article_info["editorContentObject"]["content"]
             doc = json.loads(raw_doc)
-            arcticle_df = get_data_from_json(doc, space_id, article_id, article_title, self.rename_map)
-            df = pd.concat([df, arcticle_df], ignore_index=True)
+            article_df = self.parse_json(doc, space_id, article_id, article_title)
+            df = pd.concat([df, article_df], ignore_index=True)
         self.sd_documents = self.get_documents(df)
 
     def get_documents_from_teamly_search(self, query: str) -> List[Document]:
@@ -395,12 +403,23 @@ class TeamlyAPIWrapper_SD_Tickets(TeamlyAPIWrapper):
         return get_documents_for_sd_tickets(df)
 
 
+class TeamlyAPIWrapper_Glossary(TeamlyAPIWrapper):
+    rename_map: dict = {
+    }
+    articles_json_path: str = "./data/glossary_articles.json"
+    def parse_json(self, data: str, space_id: str, article_id: str, article_title: str):
+        return get_glossary_data(data, space_id, article_id, article_title, self.rename_map)
+    def get_documents(self, df: pd.DataFrame) -> list[Document]:
+        return get_documents_for_glossary(df)
+
+
+
 if __name__ == "__main__":
     from typing import Any
     from pprint import pprint
     query = "Как удалить карточку 51 счёта?"
 
-    teamply_wrapper = TeamlyAPIWrapper("./auth.json", k=40)
+    teamply_wrapper = TeamlyAPIWrapper_Glossary("./auth.json")
 
     result = teamply_wrapper.get_documents_from_teamly_search(query)
     pprint(result)
