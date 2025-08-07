@@ -17,7 +17,7 @@ from langchain_gigachat import GigaChat
 from agents.assistants.yandex_tools.yandex_tooling import ChatYandexGPTWithTools as ChatYandexGPT
 
 from langchain_core.messages.modifier import RemoveMessage
-from langchain_core.messages import HumanMessage, AIMessage
+from langchain_core.messages import HumanMessage, AIMessage, SystemMessage
 
 from langgraph_supervisor import create_supervisor
 from langgraph.prebuilt.chat_agent_executor import create_react_agent
@@ -35,6 +35,8 @@ from agents.utils import ModelType
 from agents.tools.supervisor_tools import create_handoff_tool_no_history
 from agents.retrievers.retriever import get_search_tool, get_tickets_search_tool
 
+from agents.augment_query import get_terms_and_definitions
+
 import logging
 
 from prompts.prompts import (
@@ -48,9 +50,36 @@ from prompts.prompts import (
 
 logger = logging.getLogger(__name__)
 
-def route_request(state: State, config: ConfigSchema) -> str:
+def reset_or_run(state: State, config: ConfigSchema) -> str:
     if state["messages"][-1].content[0].get("type") == "reset":
         return "reset_memory"
+    else:
+        return "augment_query"
+
+def augment_query(state: State, config: ConfigSchema) -> State:
+    """
+    Retrieve relevant terms/definitions and append them as a SystemMessage,
+    so downstream agents see the extra context.
+    """
+    if not state["messages"]:
+        return state                       # safety guard
+
+    last_user_msg = state["messages"][-1]
+    # We only augment on real user turns
+    if last_user_msg.type != "human":
+        return state
+
+    glossary = get_terms_and_definitions(
+        last_user_msg.content[0]["text"]
+    )
+
+    # Add ONE additional system message
+    new_msgs = state["messages"] + [
+        SystemMessage(content=glossary)
+    ]
+    return {"messages": new_msgs}
+
+def route_request(state: State, config: ConfigSchema) -> str:
     queries = []
     queries.extend(
         message.content[0]["text"]
@@ -204,6 +233,7 @@ def initialize_agent(model: ModelType = ModelType.GPT, role: str = "default", us
     # Define nodes
     builder.add_node("fetch_user_info", user_info)
     builder.add_node("reset_memory", reset_memory)
+    builder.add_node("augment_query", augment_query)
 
     builder.add_node("sm_agent", sm_agent)
     builder.add_node("sd_agent", sd_agent)
@@ -213,9 +243,17 @@ def initialize_agent(model: ModelType = ModelType.GPT, role: str = "default", us
     builder.add_edge(START, "fetch_user_info")
     builder.add_conditional_edges(
         "fetch_user_info",
-        route_request,
+        reset_or_run,
         {
             "reset_memory": "reset_memory",
+            "augment_query": "augment_query",
+        }
+    )
+
+    builder.add_conditional_edges(
+        "augment_query",
+        route_request,
+        {
             "sm_agent": "sm_agent",
             "sd_agent": "sd_agent",
             "default_agent": "default_agent",
