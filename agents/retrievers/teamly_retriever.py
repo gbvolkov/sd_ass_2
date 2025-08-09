@@ -1,8 +1,11 @@
 from __future__ import annotations
 
+import logging
+
 from typing import List, Optional, Dict
 from asyncio import get_running_loop
 
+import re
 
 from langchain_community.vectorstores import FAISS
 from langchain_community.retrievers import BM25Retriever
@@ -111,10 +114,11 @@ class TeamlyRetriever_Glossary(HybridTeamlyRetriever):
         ]
         (self.idx_vectors, self.idx_bm25) = get_retrievers(docs)
     def get_abbreviations(self, query: str):
+        q = query.upper()
         return [
             d for d in self.wrapper.sd_documents
             if d.metadata.get("source") == "abbr"
-            and d.metadata["term"].lower() in query.lower().split()
+            and re.search(rf"\b{re.escape(d.metadata['term'])}\b", q)
         ]
     def _get_relevant_documents(self, query: str, *, run_manager, **kw):
         return (

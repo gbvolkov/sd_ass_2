@@ -22,6 +22,7 @@ from langchain_core.messages import HumanMessage, AIMessage, SystemMessage
 from langgraph_supervisor import create_supervisor
 from langgraph.prebuilt.chat_agent_executor import create_react_agent
 from langchain_community.tools import DuckDuckGoSearchRun
+from langchain_core.runnables import RunnableConfig
 
 from agents.tools.yandex_search import YandexSearchTool
 
@@ -50,13 +51,13 @@ from prompts.prompts import (
 
 logger = logging.getLogger(__name__)
 
-def reset_or_run(state: State, config: ConfigSchema) -> str:
+def reset_or_run(state: State, config: RunnableConfig) -> str:
     if state["messages"][-1].content[0].get("type") == "reset":
         return "reset_memory"
     else:
         return "augment_query"
 
-def augment_query(state: State, config: ConfigSchema) -> State:
+def augment_query(state: State, config: RunnableConfig) -> State:
     """
     Retrieve relevant terms/definitions and append them as a SystemMessage,
     so downstream agents see the extra context.
@@ -79,7 +80,7 @@ def augment_query(state: State, config: ConfigSchema) -> State:
     ]
     return {"messages": new_msgs}
 
-def route_request(state: State, config: ConfigSchema) -> str:
+def route_request(state: State, config: RunnableConfig) -> str:
     queries = []
     queries.extend(
         message.content[0]["text"]

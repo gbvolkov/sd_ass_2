@@ -129,13 +129,12 @@ search = get_retriever()
 
 def refresh_indexes():
     """Refresh the indexes of the active retriever (e.g., rebuild Teamly FAISS and BM25 indexes)."""
-    if config.RETRIEVER_TYPE == "teamly":
-        logging.info("Refreshing faiss indexes...")
-        if _teamly_retriever_instance:
-            _teamly_retriever_instance.refresh()
-        if _teamly_retriever_tickets_instance:
-            _teamly_retriever_tickets_instance.refresh()
-        logging.info("...complete refreshing faiss indexes.")
+    logging.info("Refreshing faiss indexes...")
+    if config.RETRIEVER_TYPE == "teamly" and _teamly_retriever_instance:
+        _teamly_retriever_instance.refresh()
+    if _teamly_retriever_tickets_instance:
+        _teamly_retriever_tickets_instance.refresh()
+    logging.info("...complete refreshing faiss indexes.")
 
 def get_search_tool(anonymizer: Palimpsest = None):
     @tool

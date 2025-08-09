@@ -260,6 +260,6 @@ def run_bot():
 
 if __name__ == '__main__':
     pid = os.getpid()
-    with open(f".process", "w") as f:
+    with open(".process", "w") as f:
         f.write(f"{pid}")
     run_bot()

@@ -28,6 +28,7 @@ embedding = HuggingFaceEmbeddings(model_name=config.EMBEDDING_MODEL, encode_kwar
 def get_retrievers(documents):
     vector_store = None
     bm25_retriever = None
+    logging.info("Loading retrievers...")
     try:
         # Initialize the embedding model (E5 large). `normalize_embeddings=True` to use cosine similarity.
 
@@ -40,4 +41,5 @@ def get_retrievers(documents):
     except Exception as e:
         logging.error(f"Error while building retrievers: {e}")
     #bm25_retriever = None
+    logging.info("...complete loading retrievers")
     return (vector_store, bm25_retriever)

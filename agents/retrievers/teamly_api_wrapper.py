@@ -193,18 +193,23 @@ class TeamlyAPIWrapper(BaseModel, ABC):
         return get_data_from_json(data, space_id, article_id, article_title, self.rename_map)
 
     def _load_sd_documents(self):
-        with open (self.articles_json_path, "r") as f:
-            articles = json.load(f)
-        df = pd.DataFrame()
-        for article_id in articles["articles"]:
-            article_info = self.get_article_info(article_id)
-            space_id = article_info["space_id"]
-            article_title = article_info["title"]
-            raw_doc = article_info["editorContentObject"]["content"]
-            doc = json.loads(raw_doc)
-            article_df = self.parse_json(doc, space_id, article_id, article_title)
-            df = pd.concat([df, article_df], ignore_index=True)
-        self.sd_documents = self.get_documents(df)
+        if config.RETRIEVER_TYPE == "teamly":
+            with open (self.articles_json_path, "r") as f:
+                articles = json.load(f)
+            df = pd.DataFrame()
+            for article_id in articles["articles"]:
+                article_info = self.get_article_info(article_id)
+                space_id = article_info["space_id"]
+                article_title = article_info["title"]
+                raw_doc = article_info["editorContentObject"]["content"]
+                doc = json.loads(raw_doc)
+                article_df = self.parse_json(doc, space_id, article_id, article_title)
+                df = pd.concat([df, article_df], ignore_index=True)
+            self.sd_documents = self.get_documents(df)
+        else:
+            with open(self.articles_data_path, "r", encoding="utf-8") as f:
+                docs_json = json.load(f)
+            self.sd_documents = [Document(page_content=item["page_content"], metadata=item["metadata"]) for item in docs_json]
 
     def get_documents_from_teamly_search(self, query: str) -> List[Document]:
         """Synchronous retrieval used by most LC components."""
