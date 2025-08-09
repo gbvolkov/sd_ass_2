@@ -386,6 +386,8 @@ class TeamlyAPIWrapper_SD_QA(TeamlyAPIWrapper):
         "Пример Тикетов": "ticket_example"
     }
     articles_json_path: str = "./data/sd_articles.json"
+    articles_data_path: str = "./data/QA_data.json"
+
     def get_documents(self, df: pd.DataFrame) -> list[Document]:
         return get_documents_for_sd_qa(df)
 
@@ -438,6 +440,23 @@ if __name__ == "__main__":
 
     query = "Как удалить карточку 51 счёта?"
     teamply_wrapper = TeamlyAPIWrapper_SD_Tickets("./auth.json")
+    docs = teamply_wrapper.sd_documents
+    docs_json = [
+        {"page_content": doc.page_content, "metadata": doc.metadata}
+        for doc in docs
+    ]
+    with open(teamply_wrapper.articles_data_path, "w", encoding="utf-8") as f:
+        json.dump(docs_json, f)
+
+
+    result = teamply_wrapper.get_documents_from_teamly_search(query)
+    pprint(result)
+
+    pprint(teamply_wrapper.sd_documents)
+
+
+    query = "Как удалить карточку 51 счёта?"
+    teamply_wrapper = TeamlyAPIWrapper_SD_QA("./auth.json")
     docs = teamply_wrapper.sd_documents
     docs_json = [
         {"page_content": doc.page_content, "metadata": doc.metadata}
