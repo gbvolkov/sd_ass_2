@@ -175,7 +175,7 @@ if __name__ == "__main__":
         
     retriever = TeamlyRetriever_Glossary(auth_data_store="./auth.json", k=5)
 
-    llm = ChatOpenAI(model="gpt-4.1-mini")
+    llm = ChatOpenAI(model="gpt-5-mini")
     with open("./prompt.txt", encoding="utf-8") as f:
         prompt_txt = f.read()
     system_prompt = ChatPromptTemplate.from_messages(

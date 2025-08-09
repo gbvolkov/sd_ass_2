@@ -13,7 +13,7 @@ with open("prompts/check_answer_prompt.txt", encoding="utf-8") as f:
     prompt_txt = f.read()
 
 prompt = PromptTemplate.from_template(prompt_txt)
-llm = ChatOpenAI(model="gpt-4.1", temperature=0)
+llm = ChatOpenAI(model="gpt-5", temperature=0)
 check_llm = llm.with_structured_output(CheckResult)
 check_chain = prompt | check_llm
 

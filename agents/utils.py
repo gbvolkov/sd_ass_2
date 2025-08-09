@@ -138,7 +138,7 @@ def image_to_uri(image_data: str) -> str:
     return f"data:image/jpeg;base64,{image_data}"
 
 def summarise_image(image_uri: str):
-    model = ChatOpenAI(model="gpt-4.1-nano")
+    model = ChatOpenAI(model="gpt-5-nano")
     message = HumanMessage(
         content=[
             {"type": "text", "text": "generate up to four key words describing the image in Russian language"},

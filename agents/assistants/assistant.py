@@ -110,7 +110,7 @@ def assistant_factory(model: ModelType, role: str = "default", tools = []):
             temperature=1,
             scope = config.GIGA_CHAT_SCOPE)
     else:
-        llm = ChatOpenAI(model="gpt-4.1-mini", temperature=1, frequency_penalty=0.3)
+        llm = ChatOpenAI(model="gpt-5-mini", temperature=1, frequency_penalty=0.3)
 
     primary_assistant_prompt = ChatPromptTemplate.from_messages(
         [
