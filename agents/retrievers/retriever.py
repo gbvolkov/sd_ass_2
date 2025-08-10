@@ -30,6 +30,7 @@ from palimpsest import Palimpsest
 from agents.retrievers.teamly_retriever import (
     TeamlyRetriever,
     TeamlyRetriever_Tickets,
+    TeamlyRetriever_Glossary,
     TeamlyContextualCompressionRetriever
 )
 import config
@@ -37,6 +38,7 @@ import config
 # Global instances and refreshable Teamly Retriever for hot index updates
 _teamly_retriever_instance: Optional[TeamlyRetriever] = None
 _teamly_retriever_tickets_instance : Optional[TeamlyRetriever_Tickets] = None
+_teamly_retriever_glossary_instance : Optional[TeamlyRetriever_Glossary] = None
 #_teamly_compression_retriever_instance: Optional[TeamlyContextualCompressionRetriever] = None
 
 def load_vectorstore(file_path: str, embedding_model_name: str) -> FAISS:
@@ -178,6 +180,44 @@ def get_tickets_search_tool(anonymizer: Palimpsest = None):
         else:
             return "No matching information found."
     return search_tickets
+
+def get_term_and_defition_tools(anonymizer: Palimpsest = None):
+    MAX_RETRIEVALS = 3
+    global _teamly_retriever_glossary_instance
+
+    _teamly_retriever_glossary_instance = TeamlyRetriever_Glossary("./auth_glossary.json", k=MAX_RETRIEVALS)
+    
+    @tool
+    def lookup_term(term: str) -> str:
+        """
+        Look up the definition of a term or abbreviation in the reference dictionary.
+
+        This tool is designed to retrieve the meaning of either a full term 
+        or an abbreviation from a predefined reference source. 
+        All abbreviations in the reference are stored in uppercase. 
+        All terms in the reference are stored in singular nominative case. 
+
+        The input must strictly follow these conventions:
+        - Abbreviations: uppercase only (e.g., "HTTP", "NASA", "АД").
+        - Terms: singular nominative case (e.g., "server", "network", "лизинговая заявка").
+
+        Args:
+            name (str): The term or abbreviation to look up.
+                Must match the format and casing conventions of the reference.
+
+        Returns:
+            str: The definition or description of the provided term or abbreviation.
+                Currently returns a constant placeholder string.
+        """
+        found_docs = _teamly_retriever_glossary_instance.invoke(term)
+        if found_docs:
+            result = "\n\n".join([doc.page_content for doc in found_docs[:30]])
+            if anonymizer:
+                result = anonymizer.anonimize(result)
+            return result
+        else:
+            return "No matching information found."
+    return lookup_term
 
 if __name__ == '__main__':
     search_kb = get_search_tool()

@@ -1,18 +1,71 @@
 from langchain_core.tools import tool
+from palimpsest import Palimpsest
 
-@tool
-def get_support_contact() -> str:
-    """Returns list of technical support contacts."""
-    return ["telegram: https://t.me/zerocoder_study_bot", "WhatsApp: +7(993)3775209"]
+from agents.augment_query import (
+    get_term_meanings
+    , get_abbreviation_meaning
+    , tnd_docs
+)
 
-@tool
-def get_customer_manager_contact(customer: str) -> str:
-    """Returns list of customer manager contacts."""
-    return ["Please find information on our site: [Zerocoder](https://zerocoder.ru/)"]
+def get_term_and_defition_tools(anonymizer: Palimpsest = None):
+    MAX_RETRIEVALS = 3
 
+    @tool
+    def lookup_term(term: str) -> str:
+        """
+        Look up the definition of a term in the reference dictionary.
 
-@tool
-def get_discounts_and_actions(topic: str) -> str:
-    """Returns information about current and upcoming discounts and actions."""
+        This tool is designed to retrieve the meaning of a full term 
+        from a predefined reference source. 
+        All terms in the reference are stored in singular nominative case. 
 
-    return "В университете иногда проходят распродажи и выдаются гранты.\nПожалуйста, свяжитесь отделом по работе с клиентами, чтобы уточнить наличие скидок."
+        The input must strictly follow these conventions:
+        - Terms: singular nominative case (e.g., "server", "network", "лизинговая заявка").
+            Keep it in the language provided by user
+
+        Args:
+            name (str): The term to look up.
+                Must match the format and casing conventions of the reference.
+
+        Returns:
+            str: The definition or description of the provided term.
+        """
+        found_docs = get_term_meanings(tnd_docs=tnd_docs, query=term)
+        if found_docs:
+            result = "\n\n".join([doc.page_content for doc in found_docs[:30]])
+            if anonymizer:
+                result = anonymizer.anonimize(result)
+            return result
+        else:
+            return "No matching information found."
+    
+    @tool
+    def lookup_abbreviation(abbreviation: str) -> str:
+        """
+        Look up the definition of an abbreviation in the reference dictionary.
+
+        This tool is designed to retrieve the meaning of 
+        an abbreviation from a predefined reference source. 
+        All abbreviations in the reference are stored in uppercase. 
+
+        The input must strictly follow these conventions:
+        - Abbreviations: uppercase only (e.g., "HTTP", "NASA", "АД").
+            Keep it in the language provided by user.
+
+        Args:
+            name (str): The abbreviation to look up.
+                Must match the format and casing conventions of the reference.
+
+        Returns:
+            str: The definition or description of the provided abbreviation.
+        """
+        found_docs = get_abbreviation_meaning(tnd_docs=tnd_docs, query=abbreviation)
+        if found_docs:
+            result = "\n\n".join([doc.page_content for doc in found_docs[:30]])
+            if anonymizer:
+                result = anonymizer.anonimize(result)
+            return result
+        else:
+            return "No matching information found."
+    
+    return (lookup_term, lookup_abbreviation)

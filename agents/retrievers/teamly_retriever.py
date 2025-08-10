@@ -2,16 +2,18 @@ from __future__ import annotations
 
 import logging
 
-from typing import List, Optional, Dict
+from typing import Any
 from asyncio import get_running_loop
+from abc import ABC, abstractmethod
 
 import re
+
+import config
 
 from langchain_community.vectorstores import FAISS
 from langchain_community.retrievers import BM25Retriever
 
 from langchain.schema import Document
-from langchain.schema.runnable import RunnableConfig
 from langchain.schema.retriever import BaseRetriever
 from langchain.retrievers.contextual_compression import ContextualCompressionRetriever
 from langchain_core.callbacks import (
@@ -27,8 +29,7 @@ from agents.retrievers.teamly_api_wrapper import (
     , TeamlyAPIWrapper
 )
 
-import config
-from abc import ABC, abstractmethod
+
 
 # ---------------------------------------------------------------------------
 # Main retriever
@@ -80,9 +81,8 @@ class HybridTeamlyRetriever(BaseRetriever, ABC):
         (self.idx_vectors, self.idx_bm25) = get_retrievers(self.wrapper.sd_documents)            
 
     def refresh(self):
-        with self._refresh_lock:
-            self.wrapper._load_sd_documents()
-            self.load_index(self.wrapper.sd_documents)
+        self.wrapper._load_sd_documents()
+        self.load_index()
 
 class TeamlyRetriever_Tickets(HybridTeamlyRetriever):
     def __init__(self, auth_data, **kw):
@@ -108,11 +108,11 @@ class TeamlyRetriever_Glossary(HybridTeamlyRetriever):
         wrapper = TeamlyAPIWrapper_Glossary(auth_data_store=auth_data_store)
         super().__init__(wrapper, **kw)
     def load_index(self):
-        docs = [
-            d for d in self.wrapper.sd_documents
-            if d.metadata.get("source") == "term"
-        ]
-        (self.idx_vectors, self.idx_bm25) = get_retrievers(docs)
+        #docs = [
+        #    d for d in self.wrapper.sd_documents
+        #    if d.metadata.get("source") == "term"
+        #]
+        (self.idx_vectors, self.idx_bm25) = (None, None) #get_retrievers(docs)
     def get_abbreviations(self, query: str):
         q = query.upper()
         return [
@@ -123,7 +123,7 @@ class TeamlyRetriever_Glossary(HybridTeamlyRetriever):
     def _get_relevant_documents(self, query: str, *, run_manager, **kw):
         return (
             self.get_abbreviations(query)
-            + self._index_search(query)
+            #+ self._index_search(query)
         )
 
 
@@ -142,7 +142,7 @@ class TeamlyContextualCompressionRetriever(ContextualCompressionRetriever):
                 space_id = doc.metadata.get("space_id", "")
                 source = doc.metadata.get("source", "")
                 if article_id and source == "semantic":
-                    doc.page_content = f"{self.base_retriever.get_article(article_id)}\n\nСсылка на статью: {self.base_retriever.base_url}/space/{space_id}/article/{article_id}"
+                    doc.page_content = f"{self.base_retriever.wrapper.get_article(article_id)}\n\nСсылка на статью: {self.base_retriever.wrapper.base_url}/space/{space_id}/article/{article_id}"
         return documents
 
 if __name__ == "__main__":
@@ -150,7 +150,6 @@ if __name__ == "__main__":
     from langchain.chains import create_retrieval_chain
     from langchain.chains.combine_documents import create_stuff_documents_chain
     from langchain_core.prompts import ChatPromptTemplate, StringPromptTemplate
-    from typing import Any
     from pprint import pprint
 
     class KBDocumentPromptTemplate(StringPromptTemplate):

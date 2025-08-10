@@ -33,6 +33,7 @@ from agents.assistants.assistant import Assistant, assistant_factory
 from agents.utils import create_tool_node_with_fallback, show_graph, _print_event, _print_response
 from agents.user_info import user_info
 from agents.utils import ModelType
+from agents.tools.tools import get_term_and_defition_tools
 from agents.tools.supervisor_tools import create_handoff_tool_no_history
 from agents.retrievers.retriever import get_search_tool, get_tickets_search_tool
 
@@ -140,9 +141,12 @@ def initialize_agent(model: ModelType = ModelType.GPT, role: str = "default", us
     team_llm = ChatOpenAI(model=config.TEAM_GPT_MODEL, temperature=1)
     
     search_kb = get_search_tool()
+    (lookup_term, lookup_abbreviation) = get_term_and_defition_tools()
     search_tickets = get_tickets_search_tool()
     search_tools = [
-        search_kb
+        search_kb,
+        lookup_term,
+        lookup_abbreviation
     ]
     
     yandex_tool = YandexSearchTool(
@@ -153,7 +157,8 @@ def initialize_agent(model: ModelType = ModelType.GPT, role: str = "default", us
     
     web_tools = [
         yandex_tool,
-        #DuckDuckGoSearchRun()
+        lookup_term,
+        lookup_abbreviation
     ]
         
     def get_validator(agent: str):

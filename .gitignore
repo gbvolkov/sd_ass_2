@@ -10,4 +10,5 @@ gv.env
 .langgraph_api
 auth.json
 auth_tickets.json
+auth_glossary.json
 nohup.out

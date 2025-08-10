@@ -122,6 +122,8 @@ def _get_article_text(base_url: str, article_info: Dict) -> str:
 # Main retriever
 # ---------------------------------------------------------------------------
 
+GLOSSARY_ARTICLE_ID="91c22083-a2cc-4928-bfad-5925b2da021f"
+
 class TeamlyAPIWrapper(BaseModel, ABC):
     """
     Teamly API Wrapper.
@@ -218,6 +220,8 @@ class TeamlyAPIWrapper(BaseModel, ABC):
         # Group hits by space_id and article_id
         grouped_hits = {}
         for hit in raw_hits:
+            if hit["article_id"] == GLOSSARY_ARTICLE_ID:
+                continue
             key = (hit["space_id"], hit["article_id"])
             if key not in grouped_hits:
                 grouped_hits[key] = []
