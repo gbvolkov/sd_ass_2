@@ -1,3 +1,4 @@
+import contextlib
 from datetime import datetime
 from http.client import HTTPException
 import logging
@@ -32,6 +33,8 @@ from store_managers.google_sheets_man import GoogleSheetsManager
 from agents.retrievers.retriever import refresh_indexes
 
 from utils.periodic_task import PeriodicTask
+
+from bot_helpers import TypingKeeper
 
 def run_bot():
 
@@ -101,14 +104,22 @@ def run_bot():
     @bot.message_handler(content_types=['text', 'voice', 'photo', 'document'])
     def handle_message(message):
         kb_update_thread.pause()
+
+        placeholder = None
+        _keeper = None
+
         try:
             chat_id = message.chat.id
             user_id = message.from_user.username
             image_uri = []
+
+            # Ensure thread settings exist
             if chat_id not in chats:
                 chats[chat_id] = ThreadSettings(user_id=user_id, chat_id=chat_id)
+
+            # ----- Build query based on content type -----
             if message.content_type == 'voice':
-                #bot.send_message(user_id, "Распознаю голосовое сообщение...")
+                # Voice -> download, transcribe, build query
                 try:
                     bot.send_chat_action(chat_id=chat_id, action="upload_voice", timeout=30)
                     file_info = bot.get_file(message.voice.file_id)
@@ -117,76 +128,187 @@ def run_bot():
                     with open(ogg_file_path, 'wb') as f:
                         f.write(downloaded_file)
 
-                    # Передаём путь к OGG-файлу в recognise_text
                     query = recognise_text(ogg_file_path)
                     os.remove(ogg_file_path)
 
                     if not query:
-                        bot.send_message(chat_id, "Не удалось распознать голосовое сообщение. Пожалуйста, отправьте текст вручную или попробуйте снова.")
+                        bot.send_message(
+                            chat_id,
+                            "Не удалось распознать голосовое сообщение. "
+                            "Пожалуйста, отправьте текст вручную или попробуйте снова."
+                        )
                         return
+
                     logging.info(f"Распознанный текст:\n{query}")
+
                 except Exception as e:
                     logging.error(f"Error processing voice message: {str(e)}")
-                    bot.send_message(chat_id, "Не удалось распознать голосовое сообщение. Пожалуйста, отправьте текст вручную или попробуйте снова.")
+                    bot.send_message(
+                        chat_id,
+                        "Не удалось распознать голосовое сообщение. "
+                        "Пожалуйста, отправьте текст вручную или попробуйте снова."
+                    )
                     return
-            elif message.content_type in ('photo', 'document'):
 
-                # Telegram compresses photos; if you need originals tell users to
-                # send the image as a *document*.  We support both here.
+            elif message.content_type in ('photo', 'document'):
+                # Photo/Document -> download, summarise, build query + image_uri
+                # Prefer any existing text (custom field) or caption as seed query
+                seed_text = getattr(message, "any_text", None) or (getattr(message, "caption", None) or "")
                 summary = ""
-                query = message.any_text or ""
+                query = seed_text
                 try:
                     bot.send_chat_action(chat_id=chat_id, action="upload_photo", timeout=30)
+
                     if message.content_type == 'photo':
-                        # photo array is sorted by size; take the last (largest) thumb
+                        # Take the largest available photo
                         file_id = message.photo[-1].file_id
                     else:
-                        # document
                         file_id = message.document.file_id
 
                     file_info = bot.get_file(file_id)
                     img_bytes = bot.download_file(file_info.file_path)
 
-                    # Convert to Base‑64 data‑URI
+                    # Convert to Base-64 data-URI and summarise
                     uri = image_to_uri(base64.b64encode(img_bytes).decode())
-                    #bot.send_message(user_id, "Обрабатываю изображение…")
                     summary = summarise_image(uri)
-                    query = query + "\n\n" + summary
+
+                    # Avoid leading blank line if seed_text is empty
+                    query = (query + "\n\n" if query else "") + summary
                     image_uri = [{"type": "image_url", "image_url": {"url": uri}}]
-                    #bot.send_message(chat_id, f"🖼️  Вот краткое описание изображения:\n\n{summary}")
+
                 except Exception as e:
                     logging.exception("Error processing image")
-                    bot.send_message(chat_id,
-                                    "Не удалось обработать изображение. "
-                                    "Попробуйте отправить другое или повторить позже.")
-            else:
-                query = message.text
+                    bot.send_message(
+                        chat_id,
+                        "Не удалось обработать изображение. "
+                        "Попробуйте отправить другое или повторить позже."
+                    )
+                    return
 
+            else:
+                # Plain text
+                query = message.text or ""
 
             assistant = chats[chat_id].assistant
+
+            # Reset memory if this is not a threaded reply (preserves your behavior)
             if not message.reply_to_message:
                 assistant.invoke(
-                    {"messages": [HumanMessage(content=[{"type": "reset", "text": "RESET"}])]}, chats[chat_id].get_config(), stream_mode="values"
+                    {"messages": [HumanMessage(content=[{"type": "reset", "text": "RESET"}])]},
+                    chats[chat_id].get_config(),
+                    stream_mode="values"
                 )
 
-            messages = HumanMessage(
-                content=[{"type": "text", "text": query}] + image_uri
-            )
+            # Message payload for the agent
+            payload_msg = HumanMessage(content=[{"type": "text", "text": query}] + image_uri)
 
-            events = assistant.stream(
-                {"messages": [messages]}, chats[chat_id].get_config(), stream_mode="values"
+            # ----- Show persistent placeholder and keep 'typing' alive -----
+            placeholder = bot.reply_to(
+                message,
+                "⌛ Обрабатываю запрос..."
             )
-            _printed = set()
-            answers = []
-            for event in events:
-                bot.send_chat_action(chat_id=chat_id, action="typing", timeout=30)
-                answer = _send_response(event, _printed, thread=chats[chat_id], bot=bot, usr_msg=message)
-                if answer and answer != "":
-                    answers.append(answer)
+            _keeper = TypingKeeper(bot, chat_id)
+            _keeper.start()
+
+            final_answer = "—"
+            # ----- Stream from agent, but DO NOT send partials; accumulate only -----
+            try:
+                events = assistant.stream(
+                    {"messages": [payload_msg]},
+                    chats[chat_id].get_config(),
+                    stream_mode="values"
+                )
+
+                _printed = set()
+                answer_parts = []
+
+                for event in events:
+                    # Keep ephemeral typing fresh as well
+                    with contextlib.suppress(Exception):
+                        bot.send_chat_action(chat_id=chat_id, action="typing", timeout=30)
+
+                    # Extract the latest AI message text and collect it
+                    if isinstance(event, dict) and event.get("messages"):
+                        msg = event["messages"]
+                        if isinstance(msg, list) and msg:
+                            msg = msg[-1]
+
+                        msg_id = getattr(msg, "id", None)
+                        msg_type = getattr(msg, "type", "")
+                        content = getattr(msg, "content", None)
+
+                        if msg_id in _printed:
+                            continue
+                        if msg_type != "ai":
+                            continue
+
+                        if isinstance(content, str) and content.strip():
+                            answer_parts.append(content.strip())
+                        elif isinstance(content, list):
+                            # Some SDKs return list of blocks; prefer textual ones
+                            parts = []
+                            for block in content:
+                                t = getattr(block, "text", None) or getattr(block, "content", None)
+                                if isinstance(t, str) and t.strip():
+                                    parts.append(t.strip())
+                            if parts:
+                                answer_parts.append("\n".join(parts))
+
+                        _printed.add(msg_id)
+
+                final_answer = "\n".join(answer_parts).strip() or "—"
+
+                # ----- Edit placeholder to the full answer (chunk if >4096) -----
+                def _chunks(s, n=4000):
+                    for i in range(0, len(s), n):
+                        yield s[i:i+n]
+
+                try:
+                    chunks = list(_chunks(final_answer))
+                    bot.edit_message_text(
+                        chunks[0],
+                        chat_id=placeholder.chat.id,
+                        message_id=placeholder.message_id
+                    )
+                    for extra in chunks[1:]:
+                        bot.send_message(chat_id, extra)
+                except Exception:
+                    # Fallback if edit fails (e.g. message deleted)
+                    bot.send_message(chat_id, final_answer)
+
+            except Exception as e:
+                # Show the error on the placeholder so the user definitely sees it
+                with contextlib.suppress(Exception):
+                    bot.edit_message_text(
+                        f"❌ Ошибка: {e}",
+                        chat_id=placeholder.chat.id,
+                        message_id=placeholder.message_id
+                    )
+                final_answer = f"Ошибка: {e}"
+            finally:
+                # Always stop typing keeper
+                with contextlib.suppress(Exception):
+                    _keeper.stop()
+
+            # Save Q&A for the rating flow
             chats[chat_id].question = query
-            chats[chat_id].answer = "\n".join(answers)
+            chats[chat_id].answer = final_answer
 
+            # Ask for rating (your existing keyboard)
             bot.send_message(chat_id, 'Пожалуйста, оцените ответ.', reply_markup=create_rating_keyboard())
+
+        except Exception as e:
+            logging.exception("Unexpected error in handle_message")
+            # If we had a placeholder up, surface the error there
+            with contextlib.suppress(Exception):
+                if placeholder:
+                    bot.edit_message_text(
+                        f"❌ Ошибка: {e}",
+                        chat_id=placeholder.chat.id,
+                        message_id=placeholder.message_id
+                    )
+                else:
+                    bot.send_message(message.chat.id, f"❌ Ошибка: {e}")
         finally:
             kb_update_thread.resume()
 
@@ -218,7 +340,7 @@ def run_bot():
                 model,
                 context[:32000]
             ])
-        
+
         # Here you can add code to store the rating in a database or file
         # For now, we'll just log it
         logging.info(f"User {username} (ID: {user_id}) rated message {call.message.message_id} as {rating}")
