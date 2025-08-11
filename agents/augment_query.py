@@ -21,10 +21,11 @@ tnd_docs = teamly_glossary_wrapper.sd_documents
 
 #glossary_retriever = TeamlyRetriever_Glossary(auth_data_store="./auth_glossary.json", k=3)
 def get_terms_and_definitions(query: str) -> str:
+    q = query.upper()
     return "\n\n".join(
         d.page_content.strip()
         for d in tnd_docs
-        if getattr(d, "page_content", None)
+        if getattr(d, "page_content", None) in q
     )
 
 def get_abbreviation_meaning(
