@@ -189,6 +189,7 @@ def get_term_meanings(
 
         if score >= min_score:
             candidates.append({
+                "page_content": d.page_content,
                 "term": term,
                 "definition": d.metadata.get("definition", ""),
                 "score": round(score, 4),

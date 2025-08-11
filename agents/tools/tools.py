@@ -32,7 +32,7 @@ def get_term_and_defition_tools(anonymizer: Palimpsest = None):
         """
         found_docs = get_term_meanings(tnd_docs=tnd_docs, query=term)
         if found_docs:
-            result = "\n\n".join([doc.page_content for doc in found_docs[:30]])
+            result = "\n\n".join([doc["_doc"].page_content for doc in found_docs[:30]])
             if anonymizer:
                 result = anonymizer.anonimize(result)
             return result
