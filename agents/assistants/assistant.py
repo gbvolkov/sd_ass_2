@@ -55,11 +55,13 @@ class Assistant:
         return {"messages": result}
 
 
-def assistant_factory(model: ModelType, role: str = "default", tools = []):
+def assistant_factory(model: ModelType, role: str = "default", tools=None):
 
+    if tools is None:
+        tools = []
     # Haiku is faster and cheaper, but less accurate
     # llm = ChatAnthropic(model="claude-3-haiku-20240307")
-    
+
     #processor = Palimpsest(verbose=False)
 
     #def anonymize(text):
@@ -67,7 +69,7 @@ def assistant_factory(model: ModelType, role: str = "default", tools = []):
 
     #def deanonymize(text):
     #    return processor.deanonimize(text)
-    
+
     if role == "sales_manager":
         with open("prompts/working_prompt_sales.txt", encoding="utf-8") as f:
             prompt = f.read()
@@ -80,14 +82,14 @@ def assistant_factory(model: ModelType, role: str = "default", tools = []):
     else:
         with open("prompts/working_prompt_employee.txt", encoding="utf-8") as f:
             prompt = f.read()
-        
+
 
     if model == ModelType.MISTRAL:
         llm = ChatMistralAI(model="mistral-large-latest", temperature=1, frequency_penalty=0.3)
     elif model == ModelType.YA:
         #model_name=f'gpt://{config.YA_FOLDER_ID}/yandexgpt/rc'
         model_name=f'gpt://{config.YA_FOLDER_ID}/yandexgpt-32k/rc'
-        
+
         llm = ChatYandexGPT(
             #iam_token = None,
             api_key = config.YA_API_KEY, 
@@ -99,7 +101,7 @@ def assistant_factory(model: ModelType, role: str = "default", tools = []):
         with open("prompts/working_prompt_ru_short.txt", encoding="utf-8") as f:
             prompt_txt = f.read()
         prompt = eval(f"f'''{prompt_txt}'''")
-        
+
         prompt = "Ты бот, который отвечает на вопросы пользователей. Перед ответом извлеки информацию из базы знаний, при помощи инструментов."
         llm = ChatLocalTools(model_id="yandex/YandexGPT-5-Lite-8B-instruct")
     elif model == ModelType.SBER:
@@ -136,7 +138,7 @@ def assistant_factory(model: ModelType, role: str = "default", tools = []):
     #anon_llm = ChatModelInterceptor(llm, anonymize, deanonymize)
     tooled_llm = llm.bind_tools(assistant_tools)
     #anon_llm = AnonimizedChatModelProxy(tooled_llm, anonymize, deanonymize)
-    
+
     assistant_chain = primary_assistant_prompt | tooled_llm
-    
+
     return assistant_chain, assistant_tools

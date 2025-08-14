@@ -4,9 +4,12 @@ import time
 
 import config
 
-from langchain_openai import ChatOpenAI
-from langchain_community.chat_models import ChatYandexGPT
-from langchain_core.prompts import ChatPromptTemplate
+#from langchain_openai import ChatOpenAI
+#from langchain_community.chat_models import ChatYandexGPT
+#from langchain_core.prompts import ChatPromptTemplate
+
+from agents.llm_utils import get_llm
+
 
 model_uri=f'cls://{config.YA_FOLDER_ID}/yandexgpt-lite/latest'
 header = {
@@ -67,14 +70,15 @@ lables = {
 
 #summariser_llm = ChatOpenAI(model="gpt-4.1-nano", temperature=0)
 
-model_name=f'gpt://{config.YA_FOLDER_ID}/yandexgpt-lite/latest'
-summariser_llm = ChatYandexGPT(
-    #iam_token = None,
-    api_key = config.YA_API_KEY, 
-    folder_id=config.YA_FOLDER_ID, 
-    model_uri=model_name,
-    temperature=0
-    )
+summariser_llm = get_llm("nano", provider="yandex", temperature=0)
+#model_name=f'gpt://{config.YA_FOLDER_ID}/yandexgpt-lite/latest'
+#summariser_llm = ChatYandexGPT(
+#    #iam_token = None,
+#    api_key = config.YA_API_KEY, 
+#    folder_id=config.YA_FOLDER_ID, 
+#    model_uri=model_name,
+#    temperature=0
+#    )
 
 
 def summarise_request(request: str, maxlen: int = 256) -> str:

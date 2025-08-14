@@ -11,7 +11,7 @@ from langchain.schema import Document
 import pymorphy2
 try:
     morph = pymorphy2.MorphAnalyzer()
-except:
+except Exception:
     morph = None
 
 ARTICLE_URL_TMPL = "https://kb.ileasing.ru/space/{space_id}/article/{article_id}"
@@ -98,7 +98,7 @@ def get_term_meanings(
 
     def _lemmatize_ru(tokens: List[str]) -> List[str]:
         # Optional: better alignment with nominative singular storage.
-        if morph == None:
+        if morph is None:
             return tokens  # fallback: no lemmatization
         lemmas = []
         for t in tokens:
@@ -114,7 +114,7 @@ def get_term_meanings(
 
     def _ratio(a: str, b: str) -> float:
         return SequenceMatcher(None, a, b).ratio() if a and b else 0.0
-    
+
     def _best_token_alignment(
         term_tokens: List[str],
         query_tokens: List[str],
@@ -152,7 +152,7 @@ def get_term_meanings(
 
     # --- iterate over term docs (exclude abbreviations) ------------------
     candidates = []
-    
+
     for d in tnd_docs:
         if d.metadata.get("source") == "abbr":
             continue  # handled elsewhere by get_abbreviations

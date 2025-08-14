@@ -11,10 +11,10 @@ from langgraph.checkpoint.memory import MemorySaver
 from langgraph.graph import END, StateGraph, START
 from langgraph.prebuilt import tools_condition
 
-from langchain_openai import ChatOpenAI
-from langchain_mistralai import ChatMistralAI
-from langchain_gigachat import GigaChat
-from agents.assistants.yandex_tools.yandex_tooling import ChatYandexGPTWithTools as ChatYandexGPT
+#from langchain_openai import ChatOpenAI
+#from langchain_mistralai import ChatMistralAI
+#from langchain_gigachat import GigaChat
+#from agents.assistants.yandex_tools.yandex_tooling import ChatYandexGPTWithTools as ChatYandexGPT
 
 from langchain_core.messages.modifier import RemoveMessage
 from langchain_core.messages import HumanMessage, AIMessage, SystemMessage
@@ -36,6 +36,7 @@ from agents.utils import ModelType
 from agents.tools.tools import get_term_and_defition_tools
 from agents.tools.supervisor_tools import create_handoff_tool_no_history
 from agents.retrievers.retriever import get_search_tool, get_tickets_search_tool
+from agents.llm_utils import get_llm
 
 from agents.augment_query import get_terms_and_definitions
 
@@ -138,7 +139,7 @@ def initialize_agent(model: ModelType = ModelType.GPT, role: str = "default", us
     # The checkpointer lets the graph persist its state
     # this is a complete memory for the entire graph.
     memory = None if use_platform_store else MemorySaver()
-    team_llm = ChatOpenAI(model=config.TEAM_GPT_MODEL, temperature=1)
+    team_llm = get_llm(config.TEAM_GPT_MODEL, temperature=1)
     
     search_kb = get_search_tool()
     (lookup_term, lookup_abbreviation) = get_term_and_defition_tools()

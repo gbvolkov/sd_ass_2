@@ -74,4 +74,6 @@ NO_CUDA = os.environ.get('NO_CUDA', "False")
 DEBUG_WORKFLOW = (os.environ.get('DEBUG_WORKFLOW', default='False').lower() == 'true')
 
 RETRIEVER_TYPE=os.environ.get('RETRIEVER_TYPE', "teamly")
-TEAM_GPT_MODEL=os.environ.get('TEAM_GPT_MODEL', "gpt-4.1-nano")
+TEAM_GPT_MODEL=os.environ.get('TEAM_GPT_MODEL', "nano")
+
+LLM_PROVIDER="openai"

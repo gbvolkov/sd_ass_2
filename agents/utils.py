@@ -8,10 +8,12 @@ from langchain_core.runnables import RunnableLambda
 from langgraph.prebuilt import ToolNode
 
 from langchain_core.messages import HumanMessage
-from langchain_openai import ChatOpenAI
+#from langchain_openai import ChatOpenAI
 
 import telegramify_markdown
 import telegramify_markdown.customize as customize
+
+from agents.llm_utils import get_llm
 
 customize.strict_markdown = False
 
@@ -138,7 +140,9 @@ def image_to_uri(image_data: str) -> str:
     return f"data:image/jpeg;base64,{image_data}"
 
 def summarise_image(image_uri: str):
-    model = ChatOpenAI(model="gpt-5-nano")
+
+    model = get_llm("nano")
+    #= ChatOpenAI(model="gpt-5-nano")
     message = HumanMessage(
         content=[
             {"type": "text", "text": "generate up to four key words describing the image in Russian language"},

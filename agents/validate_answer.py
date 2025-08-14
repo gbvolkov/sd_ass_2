@@ -2,8 +2,10 @@ from typing import Optional
 from pydantic import BaseModel, Field
 import config
 
-from langchain_openai import ChatOpenAI
+#from langchain_openai import ChatOpenAI
 from langchain_core.prompts import PromptTemplate
+
+from agents.llm_utils import get_llm
 
 class CheckResult(BaseModel):
     result: str = Field(default=None, description = "YES or NO")
@@ -13,7 +15,8 @@ with open("prompts/check_answer_prompt.txt", encoding="utf-8") as f:
     prompt_txt = f.read()
 
 prompt = PromptTemplate.from_template(prompt_txt)
-llm = ChatOpenAI(model="gpt-5", temperature=0)
+llm = get_llm("base")
+#= ChatOpenAI(model="gpt-5", temperature=0)
 check_llm = llm.with_structured_output(CheckResult)
 check_chain = prompt | check_llm
 
