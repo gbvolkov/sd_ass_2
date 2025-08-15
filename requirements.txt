@@ -34,7 +34,7 @@ trafilatura
 
 palimpsest@git+https://github.com/gbvolkov/PalimpsestLib.git
 
-telebot
+aiogram
 telegramify-markdown
 telegramify-markdown[mermaid]
 
