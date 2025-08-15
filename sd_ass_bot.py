@@ -64,7 +64,7 @@ from bot_helpers import (
 )
 
 # --- webhook config (added) ---
-RUN_MODE = (getattr(config, "RUN_MODE", "polling")).lower()
+BOT_MODE = (getattr(config, "BOT_MODE", "polling")).lower()
 WEBAPP_HOST = getattr(config, "WEBAPP_HOST", "0.0.0.0")
 WEBAPP_PORT = int(getattr(config, "WEBAPP_PORT", "8080"))
 WEBHOOK_BASE = getattr(config, "WEBHOOK_BASE", "https://0.0.0.0")  # e.g. https://bot.example.com
@@ -371,7 +371,7 @@ async def main() -> None:
     kb_update_thread.start()
 
     # --- MODE SWITCH: polling vs webhook (added) ---
-    hook_mode = RUN_MODE in {"hook", "@hook@", "webhook"}
+    hook_mode = BOT_MODE in {"hook", "@hook@", "webhook"}
     if hook_mode:
         if not WEBHOOK_URL:
             logging.error("WEBHOOK_BASE is not set. Set config.WEBHOOK_BASE or env WEBHOOK_BASE to run in @hook@ mode.")
