@@ -366,4 +366,7 @@ async def main() -> None:
 
 
 if __name__ == "__main__":
+    pid = os.getpid()
+    with open(".process", "w") as f:
+        f.write(f"{pid}")
     asyncio.run(main())
