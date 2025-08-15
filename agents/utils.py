@@ -140,19 +140,22 @@ def image_to_uri(image_data: str) -> str:
     return f"data:image/jpeg;base64,{image_data}"
 
 def summarise_image(image_uri: str):
-
     model = get_llm("nano")
-    #= ChatOpenAI(model="gpt-5-nano")
-    message = HumanMessage(
-        content=[
-            {"type": "text", "text": "generate up to four key words describing the image in Russian language"},
-            {
-                "type": "image_url",
-                "image_url": {"url": f"{image_uri}"},
-            },
-        ],
-    )
-    response = model.invoke([message])
+
+    parts = [
+        {"type": "text", "text": "generate up to four key words describing the image in Russian language"}
+    ]
+
+    if image_uri.startswith("data:"):
+        # data:[<mime>][;base64],<b64>
+        header, b64 = image_uri.split(",", 1)
+        mime = (header.split(";")[0][5:] or "image/png") if header.startswith("data:") else "image/png"
+        parts.append({"type": "input_image", "image": {"data": b64, "mime_type": mime}})
+    else:
+        parts.append({"type": "image_url", "image_url": {"url": image_uri}})
+
+    message = HumanMessage(content=parts)
+    response = model.invoke([message])  # sync on purpose
     return response.content
 
 
