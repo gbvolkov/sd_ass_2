@@ -1,4 +1,3 @@
-
 """
 sd_ass_aiogram_bot.py
 ---------------------
@@ -32,6 +31,10 @@ from aiogram.filters import Command
 from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
 from aiogram.enums import ChatAction
 
+# --- webhook imports (added) ---
+from aiohttp import web
+from aiogram.webhook.aiohttp_server import SimpleRequestHandler, setup_application
+
 import config
 
 if config.NO_CUDA == "True":
@@ -60,7 +63,14 @@ from bot_helpers import (
     vision_part_from_uri,
 )
 
-
+# --- webhook config (added) ---
+RUN_MODE = (getattr(config, "RUN_MODE", "polling")).lower()
+WEBAPP_HOST = getattr(config, "WEBAPP_HOST", "0.0.0.0")
+WEBAPP_PORT = int(getattr(config, "WEBAPP_PORT", "8080"))
+WEBHOOK_BASE = getattr(config, "WEBHOOK_BASE", "https://0.0.0.0")  # e.g. https://bot.example.com
+WEBHOOK_PATH = getattr(config, "WEBHOOK_PATH", "/tg-webhook")
+WEBHOOK_URL = (WEBHOOK_BASE or "").rstrip("/") + WEBHOOK_PATH if WEBHOOK_BASE else None
+WEBHOOK_SECRET = getattr(config, "WEBHOOK_SECRET", None)  # optional
 
 def create_rating_keyboard() -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup(
@@ -274,7 +284,6 @@ async def main() -> None:
             payload_msg = HumanMessage(content=[{"type": "text", "text": query}] + image_uri_payload)
 
             try:
-                
                 final_answer = await collect_final_text_from_stream(
                     assistant, payload_msg, chats[chat_id].get_config()
                 )
@@ -361,8 +370,36 @@ async def main() -> None:
     kb_update_thread = PeriodicTask(periodic_kb_update)
     kb_update_thread.start()
 
-    # Start polling
-    await dp.start_polling(bot)
+    # --- MODE SWITCH: polling vs webhook (added) ---
+    hook_mode = RUN_MODE in {"hook", "@hook@", "webhook"}
+    if hook_mode:
+        if not WEBHOOK_URL:
+            logging.error("WEBHOOK_BASE is not set. Set config.WEBHOOK_BASE or env WEBHOOK_BASE to run in @hook@ mode.")
+            return
+
+        app = web.Application()
+        # register webhook handler on WEBHOOK_PATH
+        SimpleRequestHandler(dispatcher=dp, bot=bot, secret_token=WEBHOOK_SECRET).register(app, path=WEBHOOK_PATH)
+        setup_application(app, dp, bot=bot)
+
+        runner = web.AppRunner(app)
+        await runner.setup()
+        site = web.TCPSite(runner, host=WEBAPP_HOST, port=WEBAPP_PORT)
+
+        try:
+            await bot.set_webhook(url=WEBHOOK_URL, secret_token=WEBHOOK_SECRET)
+            await site.start()
+            logging.info(f"Webhook set: {WEBHOOK_URL} (listening on {WEBAPP_HOST}:{WEBAPP_PORT})")
+            # keep running
+            await asyncio.Event().wait()
+        finally:
+            with contextlib.suppress(Exception):
+                await bot.delete_webhook(drop_pending_updates=False)
+            with contextlib.suppress(Exception):
+                await runner.cleanup()
+    else:
+        # Start polling (existing behavior)
+        await dp.start_polling(bot)
 
 
 if __name__ == "__main__":

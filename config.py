@@ -77,3 +77,4 @@ RETRIEVER_TYPE=os.environ.get('RETRIEVER_TYPE', "teamly")
 TEAM_GPT_MODEL=os.environ.get('TEAM_GPT_MODEL', "nano")
 
 LLM_PROVIDER="openai"
+BOT_MODE=os.environ.get('BOT_MODE', "polling")
