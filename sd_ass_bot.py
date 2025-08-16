@@ -67,7 +67,7 @@ from bot_helpers import (
 BOT_MODE = (getattr(config, "BOT_MODE", "polling")).lower()
 WEBAPP_HOST = getattr(config, "WEBAPP_HOST", "0.0.0.0")
 WEBAPP_PORT = int(getattr(config, "WEBAPP_PORT", "8080"))
-WEBHOOK_BASE = getattr(config, "WEBHOOK_BASE", "https://0.0.0.0")  # e.g. https://bot.example.com
+WEBHOOK_BASE = getattr(config, "WEBHOOK_BASE", "https://0.0.0.0:88")  # e.g. https://bot.example.com
 WEBHOOK_PATH = getattr(config, "WEBHOOK_PATH", "/tg-webhook")
 WEBHOOK_URL = (WEBHOOK_BASE or "").rstrip("/") + WEBHOOK_PATH if WEBHOOK_BASE else None
 WEBHOOK_SECRET = getattr(config, "WEBHOOK_SECRET", None)  # optional
