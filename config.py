@@ -78,8 +78,8 @@ TEAM_GPT_MODEL=os.environ.get('TEAM_GPT_MODEL', "nano")
 
 LLM_PROVIDER="openai"
 BOT_MODE=os.environ.get('BOT_MODE', "polling")
-WEBHOOK_BASE=os.environ.get('WEBHOOK_BASE')
-WEBAPP_HOST=os.environ.get('WEBAPP_HOST')
-WEBAPP_PORT=os.environ.get('WEBAPP_PORT')
-WEBHOOK_PATH=os.environ.get('WEBHOOK_PATH')
-WEBHOOK_SECRET=os.environ.get('WEBHOOK_SECRET')
+WEBHOOK_BASE=os.environ.get('WEBHOOK_BASE', "")
+WEBAPP_HOST=os.environ.get('WEBAPP_HOST', "")
+WEBAPP_PORT=os.environ.get('WEBAPP_PORT', "0")
+WEBHOOK_PATH=os.environ.get('WEBHOOK_PATH', "")
+WEBHOOK_SECRET=os.environ.get('WEBHOOK_SECRET', "")
