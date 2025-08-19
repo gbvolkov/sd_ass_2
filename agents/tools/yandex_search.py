@@ -7,6 +7,7 @@ from xml.etree import ElementTree as ET
 import trafilatura
 from duckduckgo_search.utils import _normalize, _normalize_url
 
+import logging
 
 # Input schema for the tool
 class YandexSearchInput(BaseModel):
@@ -49,6 +50,7 @@ class YandexSearchTool(BaseTool):
         try:
             return self._get_data(endpoint, headers, payload)
         except Exception as e:
+            logging.error("Error occured at summarise_request.\nException: {e}")
             return f"Yandex Search failed: {e}"
 
     def _extract_url_content(self, url: str) -> str:

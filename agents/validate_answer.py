@@ -1,5 +1,6 @@
 from typing import Optional
 from pydantic import BaseModel, Field
+import logging
 import config
 
 #from langchain_openai import ChatOpenAI
@@ -21,7 +22,11 @@ check_llm = llm.with_structured_output(CheckResult)
 check_chain = prompt | check_llm
 
 def vadildate_AI_answer(question: str, answer: str) -> CheckResult:
-    return check_chain.invoke({"question": question, "answer": answer})
+    try:
+        return check_chain.invoke({"question": question, "answer": answer})
+    except Exception as e:
+        logging.error("Error occured at vadildate_AI_answer.\nException: {e}")
+        raise e
 
 
 if __name__ == "__main__":

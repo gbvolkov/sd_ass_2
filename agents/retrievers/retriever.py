@@ -84,7 +84,11 @@ def get_retriever_teamly():
         base_compressor=reranker, base_retriever=_teamly_retriever_instance
     )
     def search(query: str) -> List[Document]:
-        result = retriever.invoke(query, search_kwargs={"k": MAX_RETRIEVALS})
+        try:
+            result = retriever.invoke(query, search_kwargs={"k": MAX_RETRIEVALS})
+        except Exception as e:
+            logging.error("Error occured during teamly search tool calling.\nException: {e}")
+            raise e
         # torch.cuda.empty_cache()
         return result
     return search
@@ -115,7 +119,11 @@ def get_retriever_faiss():
         base_compressor=reranker, base_retriever=multi_retriever
     )
     def search(query: str) -> List[Document]:
-        result = retriever.invoke(query, search_kwargs={"k": MAX_RETRIEVALS})
+        try:
+            result = retriever.invoke(query, search_kwargs={"k": MAX_RETRIEVALS})
+        except Exception as e:
+            logging.error("Error occured during faiss search tool calling.\nException: {e}")
+            raise e
         return result
     return search
 

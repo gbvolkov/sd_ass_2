@@ -1,5 +1,6 @@
 from langchain_core.tools import tool
 from palimpsest import Palimpsest
+import logging
 
 from agents.augment_query import (
     get_term_meanings
@@ -30,14 +31,18 @@ def get_term_and_defition_tools(anonymizer: Palimpsest = None):
         Returns:
             str: The definition or description of the provided term.
         """
-        found_docs = get_term_meanings(tnd_docs=tnd_docs, query=term)
-        if found_docs:
-            result = "\n\n".join([doc["_doc"].page_content for doc in found_docs[:30]])
-            if anonymizer:
-                result = anonymizer.anonimize(result)
-            return result
-        else:
-            return "No matching information found."
+        try:
+            found_docs = get_term_meanings(tnd_docs=tnd_docs, query=term)
+            if found_docs:
+                result = "\n\n".join([doc["_doc"].page_content for doc in found_docs[:30]])
+                if anonymizer:
+                    result = anonymizer.anonimize(result)
+                return result
+            else:
+                return "No matching information found."
+        except Exception as e:
+            logging.error("Error occured during lookup_term tool calling.\nException: {e}")
+            raise e
     
     @tool
     def lookup_abbreviation(abbreviation: str) -> str:
@@ -59,13 +64,17 @@ def get_term_and_defition_tools(anonymizer: Palimpsest = None):
         Returns:
             str: The definition or description of the provided abbreviation.
         """
-        found_docs = get_abbreviation_meaning(tnd_docs=tnd_docs, query=abbreviation)
-        if found_docs:
-            result = "\n\n".join([doc.page_content for doc in found_docs[:30]])
-            if anonymizer:
-                result = anonymizer.anonimize(result)
-            return result
-        else:
-            return "No matching information found."
-    
+        try:
+            found_docs = get_abbreviation_meaning(tnd_docs=tnd_docs, query=abbreviation)
+            if found_docs:
+                result = "\n\n".join([doc.page_content for doc in found_docs[:30]])
+                if anonymizer:
+                    result = anonymizer.anonimize(result)
+                return result
+            else:
+                return "No matching information found."
+        except Exception as e:
+            logging.error("Error occured during lookup_abbreviation tool calling.\nException: {e}")
+            raise e
+
     return (lookup_term, lookup_abbreviation)

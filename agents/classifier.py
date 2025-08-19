@@ -2,6 +2,7 @@ import requests
 import json
 import time
 
+import logging
 import config
 
 #from langchain_openai import ChatOpenAI
@@ -84,11 +85,15 @@ summariser_llm = get_llm("nano", provider="yandex", temperature=0)
 def summarise_request(request: str, maxlen: int = 256) -> str:
     if len(request) <= maxlen:
         return request
-    prompt = ("You have as an input series of user's requests to knowledgebase.\n" 
-        "Please prepare ONE final request, which will request all information user needs to retrieve.\n" 
-        "Always answer in Russian.\n" 
-        f"UserRequest: {request}.")
-    result = summariser_llm.invoke(prompt)
+    try:    
+        prompt = ("You have as an input series of user's requests to knowledgebase.\n" 
+            "Please prepare ONE final request, which will request all information user needs to retrieve.\n" 
+            "Always answer in Russian.\n" 
+            f"UserRequest: {request}.")
+        result = summariser_llm.invoke(prompt)
+    except Exception as e:
+        logging.error("Error occured at summarise_request.\nException: {e}")
+        raise e
     return result.content
 
 def classify_request(request: str) -> str:
@@ -107,7 +112,8 @@ def classify_request(request: str) -> str:
         predictions.sort(key = lambda x: x["confidence"], reverse=True)
         defined_class = predictions[0]["label"]
         return lables[defined_class]
-    except Exception:
+    except Exception as e:
+        logging.error("Error occured at classify_request. Return 'default_agent'\nException: {e}")
         return "default_agent"
 
 if __name__ == "__main__":
