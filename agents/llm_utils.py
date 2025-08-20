@@ -75,8 +75,6 @@ def get_model(provider: str, mode: str, config_path: str = "models.toml") -> str
 # Example:
 # model = get_model("openai", "mini")  # -> "gpt-4o-mini"
 
-
-
 def get_llm(
         mode: str = "base", 
         provider: str = None,
@@ -91,7 +89,7 @@ def get_llm(
     elif config.LLM_PROVIDER == "gigachat":
         return GigaChat(
             credentials=config.GIGA_CHAT_AUTH, 
-            model="model",
+            model=model,
             verify_ssl_certs=False,
             temperature=temperature,
             frequency_penalty=frequency_penalty,
