@@ -4,6 +4,8 @@ from typing import List, Any, Optional, Dict, Tuple, TypedDict, Annotated
 import os
 import pickle
 import torch
+from copy import deepcopy
+
 from langchain_community.document_loaders import NotionDBLoader
 from langchain_community.document_loaders import NotionDirectoryLoader
 from langchain_text_splitters import RecursiveCharacterTextSplitter
@@ -35,6 +37,28 @@ from agents.retrievers.teamly_retriever import (
 )
 import config
 
+class CrossEncoderRerankerWithScores(CrossEncoderReranker):
+    min_ratio: int = 0
+
+    def __init__(self, *args, min_ratio: float = 0.00, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.min_ratio=min_ratio
+    def compress_documents(self, documents, query, callbacks=None):
+        # compute scores
+        scores = self.model.score([(query, d.page_content) for d in documents])
+        # attach to metadata (without mutating originals)
+        docs = []
+        for d, s in zip(documents, scores):
+            d2 = deepcopy(d)
+            d2.metadata = {**(d2.metadata or {}), "rerank_score": float(s)}
+            docs.append(d2)
+        max_s = max(scores)
+        threshold = self.min_ratio*max_s
+        passed_docs = [d for d in docs if d.metadata["rerank_score"] >= threshold]
+        # sort by score desc and keep top_n
+        passed_docs.sort(key=lambda d: d.metadata["rerank_score"], reverse=True)
+        return passed_docs[: self.top_n]
+
 # Global instances and refreshable Teamly Retriever for hot index updates
 _teamly_retriever_instance: Optional[TeamlyRetriever] = None
 _teamly_retriever_tickets_instance : Optional[TeamlyRetriever_Tickets] = None
@@ -57,7 +81,7 @@ def get_retriever_multi():
         weights=[0.5, 0.5]  # adjust to favor text vs. images
     )
     reranker_model = HuggingFaceCrossEncoder(model_name=config.RERANKING_MODEL)
-    reranker = CrossEncoderReranker(model=reranker_model, top_n=3)
+    reranker = CrossEncoderRerankerWithScores(model=reranker_model, top_n=3, min_ratio=float(config.MIN_RERANKER_RATIO))
     retriever = ContextualCompressionRetriever(
         base_compressor=reranker, base_retriever=ensemble
     )
@@ -79,7 +103,7 @@ def get_retriever_teamly():
         model_name=config.RERANKING_MODEL,
         model_kwargs={'trust_remote_code': True, "device": device}
     )
-    reranker = CrossEncoderReranker(model=reranker_model, top_n=MAX_RETRIEVALS)
+    reranker = CrossEncoderRerankerWithScores(model=reranker_model, top_n=MAX_RETRIEVALS, min_ratio=float(config.MIN_RERANKER_RATIO))
     retriever = TeamlyContextualCompressionRetriever(
         base_compressor=reranker, base_retriever=_teamly_retriever_instance
     )
@@ -114,7 +138,7 @@ def get_retriever_faiss():
         model_name=config.RERANKING_MODEL,
         model_kwargs={'trust_remote_code': True, "device": device}
     )
-    reranker = CrossEncoderReranker(model=reranker_model, top_n=MAX_RETRIEVALS)
+    reranker = CrossEncoderRerankerWithScores(model=reranker_model, top_n=MAX_RETRIEVALS, min_ratio=float(config.MIN_RERANKER_RATIO))
     retriever = ContextualCompressionRetriever(
         base_compressor=reranker, base_retriever=multi_retriever
     )

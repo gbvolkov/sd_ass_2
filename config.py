@@ -83,3 +83,5 @@ WEBAPP_HOST=os.environ.get('WEBAPP_HOST', "")
 WEBAPP_PORT=os.environ.get('WEBAPP_PORT', "0")
 WEBHOOK_PATH=os.environ.get('WEBHOOK_PATH', "")
 WEBHOOK_SECRET=os.environ.get('WEBHOOK_SECRET', "")
+
+MIN_RERANKER_RATIO=os.environ.get('MIN_RERANKER_RATIO', "0.25")
