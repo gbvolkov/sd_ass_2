@@ -111,7 +111,7 @@ def get_retriever_teamly():
         try:
             result = retriever.invoke(query, search_kwargs={"k": MAX_RETRIEVALS})
         except Exception as e:
-            logging.error("Error occured during teamly search tool calling.\nException: {e}")
+            logging.error(f"Error occured during teamly search tool calling.\nException: {e}")
             raise e
         # torch.cuda.empty_cache()
         return result
@@ -146,7 +146,7 @@ def get_retriever_faiss():
         try:
             result = retriever.invoke(query, search_kwargs={"k": MAX_RETRIEVALS})
         except Exception as e:
-            logging.error("Error occured during faiss search tool calling.\nException: {e}")
+            logging.error(f"Error occured during faiss search tool calling.\nException: {e}")
             raise e
         return result
     return search
