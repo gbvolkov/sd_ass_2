@@ -43,7 +43,7 @@ if config.NO_CUDA == "True":
 from thread_settings import ThreadSettings
 from agents.utils import summarise_image, image_to_uri, ModelType  # noqa: F401 (ModelType kept for parity)
 from langchain_core.messages import HumanMessage
-from agents.retrievers.retriever import refresh_indexes
+from agents.retrievers.utils.load_common_retrievers import refresh_indexes
 from store_managers.google_sheets_man import GoogleSheetsManager
 
 # Voice recognition

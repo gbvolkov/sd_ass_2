@@ -35,18 +35,12 @@ import config
 from agents.retrievers.utils.load_common_retrievers import (
     buildMultiRetriever,
     buildTeamlyRetriever,
-    buildFAISSRetriever
+    buildFAISSRetriever,
+    getTeamlyTicketsRetriever,
+    getTeamlyGlossaryRetriever,
 )
 
 from agents.retrievers.cross_encoder_reranker_with_score import CrossEncoderRerankerWithScores
-
-
-# Global instances and refreshable Teamly Retriever for hot index updates
-_teamly_retriever_instance: Optional[TeamlyRetriever] = None
-_teamly_retriever_tickets_instance : Optional[TeamlyRetriever_Tickets] = None
-_teamly_retriever_glossary_instance : Optional[TeamlyRetriever_Glossary] = None
-#_teamly_compression_retriever_instance: Optional[TeamlyContextualCompressionRetriever] = None
-
 
 
 def get_retriever_multi():
@@ -100,15 +94,6 @@ def get_retriever():
 search = get_retriever()
 
 
-def refresh_indexes():
-    """Refresh the indexes of the active retriever (e.g., rebuild Teamly FAISS and BM25 indexes)."""
-    logging.info("Refreshing faiss indexes...")
-    if config.RETRIEVER_TYPE == "teamly" and _teamly_retriever_instance:
-        _teamly_retriever_instance.refresh()
-    if _teamly_retriever_tickets_instance:
-        _teamly_retriever_tickets_instance.refresh()
-    logging.info("...complete refreshing faiss indexes.")
-
 def get_search_tool(anonymizer: Palimpsest = None):
     @tool
     def search_kb(query: str) -> str:
@@ -130,11 +115,8 @@ def get_search_tool(anonymizer: Palimpsest = None):
 
 def get_tickets_search_tool(anonymizer: Palimpsest = None):
     MAX_RETRIEVALS = 3
-    global _teamly_retriever_tickets_instance
 
-    if _teamly_retriever_tickets_instance is None:
-        _teamly_retriever_tickets_instance = TeamlyRetriever_Tickets("./auth_tickets.json", k=MAX_RETRIEVALS)
-    
+    tickets_retriever = getTeamlyTicketsRetriever()
     @tool
     def search_tickets(query: str) -> str:
         """Retrieves from tickets knowledgebase context suitable for the query. Shall be always used when user asks question.
@@ -143,7 +125,7 @@ def get_tickets_search_tool(anonymizer: Palimpsest = None):
         Returns:
             Context from knowledgebase suitable for the query.
         """
-        found_docs = _teamly_retriever_tickets_instance.invoke(query)
+        found_docs = tickets_retriever.invoke(query)
         if found_docs:
             result = "\n\n".join([doc.page_content for doc in found_docs[:30]])
             if anonymizer:
@@ -155,10 +137,7 @@ def get_tickets_search_tool(anonymizer: Palimpsest = None):
 
 def get_term_and_defition_tools(anonymizer: Palimpsest = None):
     MAX_RETRIEVALS = 3
-    global _teamly_retriever_glossary_instance
-
-    if _teamly_retriever_glossary_instance is None:
-        _teamly_retriever_glossary_instance = TeamlyRetriever_Glossary("./auth_glossary.json", k=MAX_RETRIEVALS)
+    glossary_retriever = getTeamlyGlossaryRetriever()
     
     @tool
     def lookup_term(term: str) -> str:
@@ -182,7 +161,7 @@ def get_term_and_defition_tools(anonymizer: Palimpsest = None):
             str: The definition or description of the provided term or abbreviation.
                 Currently returns a constant placeholder string.
         """
-        found_docs = _teamly_retriever_glossary_instance.invoke(term)
+        found_docs = glossary_retriever.invoke(term)
         if found_docs:
             result = "\n\n".join([doc.page_content for doc in found_docs[:30]])
             if anonymizer:

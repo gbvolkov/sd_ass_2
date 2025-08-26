@@ -29,8 +29,8 @@ import config
 
 
 _teamly_retriever_instance: Optional[TeamlyRetriever] = None
-#_teamly_retriever_tickets_instance : Optional[TeamlyRetriever_Tickets] = None
-#_teamly_retriever_glossary_instance : Optional[TeamlyRetriever_Glossary] = None
+_teamly_retriever_tickets_instance : Optional[TeamlyRetriever_Tickets] = None
+_teamly_retriever_glossary_instance : Optional[TeamlyRetriever_Glossary] = None
 
 _teamly_reranker_retriever: Optional[TeamlyContextualCompressionRetriever] = None
 _faiss_reranker_retriever: Optional[ContextualCompressionRetriever] = None
@@ -43,6 +43,7 @@ def getFAISSIndex(file_path: str)-> FAISS:
     global _faiss_indexes
     index = _faiss_indexes.get(file_path, None)
     if index is None:
+        logging.info("loading index FAISS {file_path}")
         index = FAISS.load_local(file_path, getEmbeddingModel(), allow_dangerous_deserialization=True)
         _faiss_indexes[file_path] = index
     return index
@@ -55,7 +56,7 @@ def load_vectorstore(file_path: str) -> FAISS:
 def buildEnsembleRetriever(index_paths: list[str], search_kwargs: dict, weights: list[float])-> EnsembleRetriever:
     base_retrievers = []
     for index_path in index_paths:
-        base_retrievers.extend(load_vectorstore(index_paths).as_retriever(search_kwargs=search_kwargs))
+        base_retrievers.extend(load_vectorstore(index_path).as_retriever(search_kwargs=search_kwargs))
     return EnsembleRetriever(
         retrievers=[base_retrievers],
         weights=weights  # adjust to favor text vs. images
@@ -63,8 +64,10 @@ def buildEnsembleRetriever(index_paths: list[str], search_kwargs: dict, weights:
 
 def buildMultiRetriever(index_paths: list[str], search_kwargs: dict, weights: list[float])-> ContextualCompressionRetriever:
     global _multi_retrievers
-    retriever = _multi_retrievers.get(index_paths, None)
+    paths_str = ";".join(index_paths)
+    retriever = _multi_retrievers.get(paths_str, None)
     if retriever is None:
+        logging.info(f"loading multiretriever {paths_str}")
         ensemble = buildEnsembleRetriever(index_paths, search_kwargs, weights)
         reranker_model = getRerankerModel()
         reranker = CrossEncoderRerankerWithScores(model=reranker_model, top_n=3, min_ratio=float(config.MIN_RERANKER_RATIO))
@@ -77,14 +80,45 @@ def buildMultiRetriever(index_paths: list[str], search_kwargs: dict, weights: li
 _MAX_TEAMLY_RETRIEVALS = 40
 _MAX_RETRIEVALS = 3
 
-def buildTeamlyRetriever()-> TeamlyContextualCompressionRetriever:
+
+def refresh_indexes():
+    """Refresh the indexes of the active retriever (e.g., rebuild Teamly FAISS and BM25 indexes)."""
+    logging.info("Refreshing faiss indexes...")
+    if config.RETRIEVER_TYPE == "teamly" and _teamly_retriever_instance:
+        _teamly_retriever_instance.refresh()
+    if _teamly_retriever_tickets_instance:
+        _teamly_retriever_tickets_instance.refresh()
+    logging.info("...complete refreshing faiss indexes.")
+
+
+def getTeamlyRetriever()-> TeamlyRetriever:
     global _teamly_retriever_instance
+    if _teamly_retriever_instance is None:
+        logging.info("loading TeamlyRetriever")
+        _teamly_retriever_instance = TeamlyRetriever("./auth.json", k=_MAX_TEAMLY_RETRIEVALS)
+    return _teamly_retriever_instance
+
+def getTeamlyTicketsRetriever()-> TeamlyRetriever_Tickets:
+    global _teamly_retriever_tickets_instance
+    if _teamly_retriever_tickets_instance is None:
+        logging.info("loading TeamlyRetriever_Tickets")
+        _teamly_retriever_tickets_instance = TeamlyRetriever_Tickets("./auth_tickets.json", k=_MAX_RETRIEVALS)
+    return _teamly_retriever_tickets_instance
+
+def getTeamlyGlossaryRetriever()-> TeamlyRetriever_Glossary:
+    global _teamly_retriever_glossary_instance
+    if _teamly_retriever_glossary_instance is None:
+        logging.info("loading TeamlyRetriever_Glossary")
+        _teamly_retriever_glossary_instance = TeamlyRetriever_Glossary("./auth_glossary.json", k=_MAX_RETRIEVALS)
+    return _teamly_retriever_glossary_instance
+
+def buildTeamlyRetriever()-> TeamlyContextualCompressionRetriever:
     global _teamly_reranker_retriever
 
     if _teamly_reranker_retriever is None:
         # Initialize Teamly retriever with refresh support
-        if _teamly_retriever_instance is None:
-            _teamly_retriever_instance = TeamlyRetriever("./auth.json", k=_MAX_TEAMLY_RETRIEVALS)
+        logging.info("loading TeamlyRetriever reranked")
+        teamly_retriever = getTeamlyRetriever()
         reranker_model = getRerankerModel()
 
         reranker = CrossEncoderRerankerWithScores(
@@ -93,13 +127,14 @@ def buildTeamlyRetriever()-> TeamlyContextualCompressionRetriever:
         )
         _teamly_reranker_retriever = TeamlyContextualCompressionRetriever(
             base_compressor=reranker, 
-            base_retriever=_teamly_retriever_instance
+            base_retriever=teamly_retriever
         )
     return _teamly_reranker_retriever
 
 def buildFAISSRetriever()-> ContextualCompressionRetriever:
     global _faiss_reranker_retriever
     if _faiss_reranker_retriever is None:
+        logging.info("loading FAISSRetriever reranked")
         vector_store_path = config.ASSISTANT_INDEX_FOLDER
         vectorstore = load_vectorstore(vector_store_path)
 
