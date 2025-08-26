@@ -9,7 +9,6 @@ from copy import deepcopy
 from langchain_community.document_loaders import NotionDBLoader
 from langchain_community.document_loaders import NotionDirectoryLoader
 from langchain_text_splitters import RecursiveCharacterTextSplitter
-from langchain_huggingface import HuggingFaceEmbeddings
 from langchain_core.vectorstores import InMemoryVectorStore
 from langchain.docstore.document import Document
 from langchain_core.messages import AnyMessage, HumanMessage, AIMessage
@@ -20,7 +19,6 @@ from langchain.retrievers import EnsembleRetriever
 from langchain.retrievers.contextual_compression import ContextualCompressionRetriever
 from langchain.retrievers.document_compressors import CrossEncoderReranker
 from langchain.retrievers.multi_vector import MultiVectorRetriever
-from langchain_community.cross_encoders import HuggingFaceCrossEncoder
 from langchain.storage import InMemoryByteStore
 from langchain_core.tools import tool
 from langgraph.graph.message import add_messages
@@ -36,6 +34,8 @@ from agents.retrievers.teamly_retriever import (
     TeamlyContextualCompressionRetriever
 )
 import config
+
+from agents.retrievers.utils.load_models import getEmbeddingModel, getRerankerModel
 
 class CrossEncoderRerankerWithScores(CrossEncoderReranker):
     min_ratio: int = 0
@@ -59,28 +59,32 @@ class CrossEncoderRerankerWithScores(CrossEncoderReranker):
         passed_docs.sort(key=lambda d: d.metadata["rerank_score"], reverse=True)
         return passed_docs[: self.top_n]
 
+
 # Global instances and refreshable Teamly Retriever for hot index updates
 _teamly_retriever_instance: Optional[TeamlyRetriever] = None
 _teamly_retriever_tickets_instance : Optional[TeamlyRetriever_Tickets] = None
 _teamly_retriever_glossary_instance : Optional[TeamlyRetriever_Glossary] = None
 #_teamly_compression_retriever_instance: Optional[TeamlyContextualCompressionRetriever] = None
 
-def load_vectorstore(file_path: str, embedding_model_name: str) -> FAISS:
+
+
+
+def load_vectorstore(file_path: str) -> FAISS:
     if not os.path.exists(file_path):
         raise FileNotFoundError(f"No vectorstore found at {file_path}")
-    embeddings = HuggingFaceEmbeddings(model_name=embedding_model_name)
+    embeddings = getEmbeddingModel()
     return FAISS.load_local(file_path, embeddings, allow_dangerous_deserialization=True)
 
 def get_retriever_multi():
-    notion_vs = load_vectorstore(config.NOTION_INDEX_FOLDER, config.EMBEDDING_MODEL)
-    chats_vs = load_vectorstore(config.CHATS_INDEX_FOLDER, config.EMBEDDING_MODEL)
+    notion_vs = load_vectorstore(config.NOTION_INDEX_FOLDER)
+    chats_vs = load_vectorstore(config.CHATS_INDEX_FOLDER)
     k = 5
     ensemble = EnsembleRetriever(
         retrievers=[notion_vs.as_retriever(search_kwargs={"k": k}),
                     chats_vs.as_retriever(search_kwargs={"k": k})],
         weights=[0.5, 0.5]  # adjust to favor text vs. images
     )
-    reranker_model = HuggingFaceCrossEncoder(model_name=config.RERANKING_MODEL)
+    reranker_model = getRerankerModel()
     reranker = CrossEncoderRerankerWithScores(model=reranker_model, top_n=3, min_ratio=float(config.MIN_RERANKER_RATIO))
     retriever = ContextualCompressionRetriever(
         base_compressor=reranker, base_retriever=ensemble
@@ -94,18 +98,18 @@ def get_retriever_multi():
 
 def get_retriever_teamly():
     MAX_RETRIEVALS = 3
-    global _teamly_retriever_instance#, _teamly_compression_retriever_instance
+    global _teamly_retriever_instance
     # Initialize Teamly retriever with refresh support
     _teamly_retriever_instance = TeamlyRetriever("./auth.json", k=40)
-    device = "cuda" if torch.cuda.is_available() else "cpu"
-    # device = "cpu"
-    reranker_model = HuggingFaceCrossEncoder(
-        model_name=config.RERANKING_MODEL,
-        model_kwargs={'trust_remote_code': True, "device": device}
+
+    reranker_model = getRerankerModel()
+    reranker = CrossEncoderRerankerWithScores(
+        model=reranker_model, top_n=MAX_RETRIEVALS, 
+        min_ratio=float(config.MIN_RERANKER_RATIO)
     )
-    reranker = CrossEncoderRerankerWithScores(model=reranker_model, top_n=MAX_RETRIEVALS, min_ratio=float(config.MIN_RERANKER_RATIO))
     retriever = TeamlyContextualCompressionRetriever(
-        base_compressor=reranker, base_retriever=_teamly_retriever_instance
+        base_compressor=reranker, 
+        base_retriever=_teamly_retriever_instance
     )
     def search(query: str) -> List[Document]:
         try:
@@ -120,7 +124,7 @@ def get_retriever_teamly():
 def get_retriever_faiss():
     MAX_RETRIEVALS = 3
     vector_store_path = config.ASSISTANT_INDEX_FOLDER
-    vectorstore = load_vectorstore(vector_store_path, config.EMBEDDING_MODEL)
+    vectorstore = load_vectorstore(vector_store_path)
     with open(f'{vector_store_path}/docstore.pkl', 'rb') as file:
         documents = pickle.load(file)
     doc_ids = [doc.metadata.get('problem_number', '') for doc in documents]
@@ -133,14 +137,15 @@ def get_retriever_faiss():
         search_kwargs={"k": MAX_RETRIEVALS},
     )
     multi_retriever.docstore.mset(list(zip(doc_ids, documents)))
-    device = "cuda" if torch.cuda.is_available() else "cpu"
-    reranker_model = HuggingFaceCrossEncoder(
-        model_name=config.RERANKING_MODEL,
-        model_kwargs={'trust_remote_code': True, "device": device}
+    reranker_model = getRerankerModel()
+    reranker = CrossEncoderRerankerWithScores(
+        model=reranker_model, 
+        top_n=MAX_RETRIEVALS, 
+        min_ratio=float(config.MIN_RERANKER_RATIO)
     )
-    reranker = CrossEncoderRerankerWithScores(model=reranker_model, top_n=MAX_RETRIEVALS, min_ratio=float(config.MIN_RERANKER_RATIO))
     retriever = ContextualCompressionRetriever(
-        base_compressor=reranker, base_retriever=multi_retriever
+        base_compressor=reranker, 
+        base_retriever=multi_retriever
     )
     def search(query: str) -> List[Document]:
         try:
