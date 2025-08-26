@@ -1,16 +1,18 @@
+import logging
+
 import torch
+
+from typing import List, Any, Optional, Dict, Tuple, TypedDict, Annotated
 
 from langchain_huggingface import HuggingFaceEmbeddings
 from langchain_community.cross_encoders import HuggingFaceCrossEncoder
-import logging
-import config
 
+import config
 
 _device = "cuda" if torch.cuda.is_available() else "cpu"
 
-
-_embedding_model: HuggingFaceEmbeddings = None
-_reranker_model: HuggingFaceCrossEncoder = None
+_embedding_model: Optional[HuggingFaceEmbeddings] = None
+_reranker_model: Optional[HuggingFaceCrossEncoder] = None
 
 def getEmbeddingModel()-> HuggingFaceEmbeddings:
     global _embedding_model

@@ -7,7 +7,7 @@ import logging
 
 import config
 
-from agents.retrievers.utils.load_models import getEmbeddingModel
+from agents.retrievers.utils.models_builder import getEmbeddingModel
 
 embedding = getEmbeddingModel() #HuggingFaceEmbeddings(model_name=config.EMBEDDING_MODEL, encode_kwargs={"normalize_embeddings": True})
 

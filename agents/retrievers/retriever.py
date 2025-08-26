@@ -4,7 +4,6 @@ from typing import List, Any, Optional, Dict, Tuple, TypedDict, Annotated
 import os
 import pickle
 import torch
-from copy import deepcopy
 
 from langchain_community.document_loaders import NotionDBLoader
 from langchain_community.document_loaders import NotionDirectoryLoader
@@ -17,7 +16,6 @@ from langchain_openai import ChatOpenAI
 from langchain_community.vectorstores import FAISS
 from langchain.retrievers import EnsembleRetriever
 from langchain.retrievers.contextual_compression import ContextualCompressionRetriever
-from langchain.retrievers.document_compressors import CrossEncoderReranker
 from langchain.retrievers.multi_vector import MultiVectorRetriever
 from langchain.storage import InMemoryByteStore
 from langchain_core.tools import tool
@@ -25,7 +23,6 @@ from langgraph.graph.message import add_messages
 from langgraph.prebuilt import ToolNode
 from langgraph.graph import START, END, StateGraph
 from langgraph.prebuilt import tools_condition
-from langchain_community.vectorstores import FAISS
 from palimpsest import Palimpsest
 from agents.retrievers.teamly_retriever import (
     TeamlyRetriever,
@@ -35,29 +32,13 @@ from agents.retrievers.teamly_retriever import (
 )
 import config
 
-from agents.retrievers.utils.load_models import getEmbeddingModel, getRerankerModel
+from agents.retrievers.utils.load_common_retrievers import (
+    buildMultiRetriever,
+    buildTeamlyRetriever,
+    buildFAISSRetriever
+)
 
-class CrossEncoderRerankerWithScores(CrossEncoderReranker):
-    min_ratio: int = 0
-
-    def __init__(self, *args, min_ratio: float = 0.00, **kwargs):
-        super().__init__(*args, **kwargs)
-        self.min_ratio=min_ratio
-    def compress_documents(self, documents, query, callbacks=None):
-        # compute scores
-        scores = self.model.score([(query, d.page_content) for d in documents])
-        # attach to metadata (without mutating originals)
-        docs = []
-        for d, s in zip(documents, scores):
-            d2 = deepcopy(d)
-            d2.metadata = {**(d2.metadata or {}), "rerank_score": float(s)}
-            docs.append(d2)
-        max_s = max(scores)
-        threshold = self.min_ratio*max_s
-        passed_docs = [d for d in docs if d.metadata["rerank_score"] >= threshold]
-        # sort by score desc and keep top_n
-        passed_docs.sort(key=lambda d: d.metadata["rerank_score"], reverse=True)
-        return passed_docs[: self.top_n]
+from agents.retrievers.cross_encoder_reranker_with_score import CrossEncoderRerankerWithScores
 
 
 # Global instances and refreshable Teamly Retriever for hot index updates
@@ -68,26 +49,13 @@ _teamly_retriever_glossary_instance : Optional[TeamlyRetriever_Glossary] = None
 
 
 
-
-def load_vectorstore(file_path: str) -> FAISS:
-    if not os.path.exists(file_path):
-        raise FileNotFoundError(f"No vectorstore found at {file_path}")
-    embeddings = getEmbeddingModel()
-    return FAISS.load_local(file_path, embeddings, allow_dangerous_deserialization=True)
-
 def get_retriever_multi():
-    notion_vs = load_vectorstore(config.NOTION_INDEX_FOLDER)
-    chats_vs = load_vectorstore(config.CHATS_INDEX_FOLDER)
     k = 5
-    ensemble = EnsembleRetriever(
-        retrievers=[notion_vs.as_retriever(search_kwargs={"k": k}),
-                    chats_vs.as_retriever(search_kwargs={"k": k})],
-        weights=[0.5, 0.5]  # adjust to favor text vs. images
-    )
-    reranker_model = getRerankerModel()
-    reranker = CrossEncoderRerankerWithScores(model=reranker_model, top_n=3, min_ratio=float(config.MIN_RERANKER_RATIO))
-    retriever = ContextualCompressionRetriever(
-        base_compressor=reranker, base_retriever=ensemble
+
+    retriever = buildMultiRetriever(
+        [config.NOTION_INDEX_FOLDER, config.CHATS_INDEX_FOLDER],
+        search_kwargs={"k": k},
+        weights=[0.5, 0.5]
     )
     def search(query: str) -> List[Document]:
         result = retriever.invoke(query, search_kwargs={"k": k})
@@ -97,23 +65,12 @@ def get_retriever_multi():
     return search
 
 def get_retriever_teamly():
-    MAX_RETRIEVALS = 3
-    global _teamly_retriever_instance
-    # Initialize Teamly retriever with refresh support
-    _teamly_retriever_instance = TeamlyRetriever("./auth.json", k=40)
+    max_retrievals = 3
+    retriever = buildTeamlyRetriever()
 
-    reranker_model = getRerankerModel()
-    reranker = CrossEncoderRerankerWithScores(
-        model=reranker_model, top_n=MAX_RETRIEVALS, 
-        min_ratio=float(config.MIN_RERANKER_RATIO)
-    )
-    retriever = TeamlyContextualCompressionRetriever(
-        base_compressor=reranker, 
-        base_retriever=_teamly_retriever_instance
-    )
     def search(query: str) -> List[Document]:
         try:
-            result = retriever.invoke(query, search_kwargs={"k": MAX_RETRIEVALS})
+            result = retriever.invoke(query, search_kwargs={"k": max_retrievals})
         except Exception as e:
             logging.error(f"Error occured during teamly search tool calling.\nException: {e}")
             raise e
@@ -123,30 +80,7 @@ def get_retriever_teamly():
 
 def get_retriever_faiss():
     MAX_RETRIEVALS = 3
-    vector_store_path = config.ASSISTANT_INDEX_FOLDER
-    vectorstore = load_vectorstore(vector_store_path)
-    with open(f'{vector_store_path}/docstore.pkl', 'rb') as file:
-        documents = pickle.load(file)
-    doc_ids = [doc.metadata.get('problem_number', '') for doc in documents]
-    store = InMemoryByteStore()
-    id_key = "problem_number"
-    multi_retriever = MultiVectorRetriever(
-        vectorstore=vectorstore,
-        byte_store=store,
-        id_key=id_key,
-        search_kwargs={"k": MAX_RETRIEVALS},
-    )
-    multi_retriever.docstore.mset(list(zip(doc_ids, documents)))
-    reranker_model = getRerankerModel()
-    reranker = CrossEncoderRerankerWithScores(
-        model=reranker_model, 
-        top_n=MAX_RETRIEVALS, 
-        min_ratio=float(config.MIN_RERANKER_RATIO)
-    )
-    retriever = ContextualCompressionRetriever(
-        base_compressor=reranker, 
-        base_retriever=multi_retriever
-    )
+    retriever = buildFAISSRetriever()
     def search(query: str) -> List[Document]:
         try:
             result = retriever.invoke(query, search_kwargs={"k": MAX_RETRIEVALS})
@@ -198,7 +132,8 @@ def get_tickets_search_tool(anonymizer: Palimpsest = None):
     MAX_RETRIEVALS = 3
     global _teamly_retriever_tickets_instance
 
-    _teamly_retriever_tickets_instance = TeamlyRetriever_Tickets("./auth_tickets.json", k=MAX_RETRIEVALS)
+    if _teamly_retriever_tickets_instance is None:
+        _teamly_retriever_tickets_instance = TeamlyRetriever_Tickets("./auth_tickets.json", k=MAX_RETRIEVALS)
     
     @tool
     def search_tickets(query: str) -> str:
@@ -222,7 +157,8 @@ def get_term_and_defition_tools(anonymizer: Palimpsest = None):
     MAX_RETRIEVALS = 3
     global _teamly_retriever_glossary_instance
 
-    _teamly_retriever_glossary_instance = TeamlyRetriever_Glossary("./auth_glossary.json", k=MAX_RETRIEVALS)
+    if _teamly_retriever_glossary_instance is None:
+        _teamly_retriever_glossary_instance = TeamlyRetriever_Glossary("./auth_glossary.json", k=MAX_RETRIEVALS)
     
     @tool
     def lookup_term(term: str) -> str:
