@@ -2,6 +2,7 @@ import torch
 
 from langchain_huggingface import HuggingFaceEmbeddings
 from langchain_community.cross_encoders import HuggingFaceCrossEncoder
+import logging
 import config
 
 
@@ -14,6 +15,7 @@ _reranker_model: HuggingFaceCrossEncoder = None
 def getEmbeddingModel()-> HuggingFaceEmbeddings:
     global _embedding_model
     if _embedding_model is None:
+        logging.info(f"loading model for embedding:  {config.EMBEDDING_MODEL}")
         _embedding_model = HuggingFaceEmbeddings(
             model_name=config.EMBEDDING_MODEL,
             encode_kwargs={"normalize_embeddings": True}
@@ -23,6 +25,7 @@ def getEmbeddingModel()-> HuggingFaceEmbeddings:
 def getRerankerModel()-> HuggingFaceCrossEncoder:
     global _reranker_model
     if _reranker_model is None:
+        logging.info(f"loading model for reranker: {config.RERANKING_MODEL}")
         _reranker_model = HuggingFaceCrossEncoder(
             model_name=config.RERANKING_MODEL, 
             model_kwargs={'trust_remote_code': True, "device": _device}
