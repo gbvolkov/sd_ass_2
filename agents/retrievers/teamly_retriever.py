@@ -56,18 +56,22 @@ class HybridTeamlyRetriever(BaseRetriever, ABC):
 
 
     def _index_search(self, query: str) -> list[Document]:
-        docs = []
-        if self.idx_vectors:
-            docs.extend(self.idx_vectors.similarity_search(query, k=self.k))
-        if self.idx_bm25:
-            docs.extend(self.idx_bm25.invoke(query)[: self.k])
+        try:
+            docs = []
+            if self.idx_vectors:
+                docs.extend(self.idx_vectors.similarity_search(query, k=self.k))
+            if self.idx_bm25:
+                docs.extend(self.idx_bm25.invoke(query)[: self.k])
 
-        return [
-            d
-            for seen in [set()]
-            for d in docs
-            if not (d.page_content in seen or seen.add(d.page_content))
-        ]
+            return [
+                d
+                for seen in [set()]
+                for d in docs
+                if not (d.page_content in seen or seen.add(d.page_content))
+            ]
+        except Exception as e:
+            logging.error(f"Error occured at 'HybridTeamlyRetriever::_index_search'.\nException: {e}")
+            raise e
 
     @abstractmethod
     def _get_relevant_documents(self, query: str, *, run_manager, **kw):
@@ -135,14 +139,18 @@ class TeamlyContextualCompressionRetriever(ContextualCompressionRetriever):
         run_manager: CallbackManagerForRetrieverRun,
         **kwargs: Any,
     ) -> list[Document]:
-        documents = super()._get_relevant_documents(query, run_manager=run_manager, **kwargs)
-        if isinstance(self.base_retriever, TeamlyRetriever):
-            for doc in documents:
-                article_id = doc.metadata.get("article_id")
-                space_id = doc.metadata.get("space_id", "")
-                source = doc.metadata.get("source", "")
-                if article_id and source == "semantic":
-                    doc.page_content = f"{self.base_retriever.wrapper.get_article(article_id)}\n\nСсылка на статью: {self.base_retriever.wrapper.base_url}/space/{space_id}/article/{article_id}"
+        try:
+            documents = super()._get_relevant_documents(query, run_manager=run_manager, **kwargs)
+            if isinstance(self.base_retriever, TeamlyRetriever):
+                for doc in documents:
+                    article_id = doc.metadata.get("article_id")
+                    space_id = doc.metadata.get("space_id", "")
+                    source = doc.metadata.get("source", "")
+                    if article_id and source == "semantic":
+                        doc.page_content = f"{self.base_retriever.wrapper.get_article(article_id)}\n\nСсылка на статью: {self.base_retriever.wrapper.base_url}/space/{space_id}/article/{article_id}"
+        except Exception as e:
+            logging.error(f"Error occured at 'TeamlyContextualCompressionRetriever::_get_relevant_documents'.\nException: {e}")
+            raise e
         return documents
 
 if __name__ == "__main__":

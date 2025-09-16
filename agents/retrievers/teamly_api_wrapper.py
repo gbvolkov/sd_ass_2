@@ -20,6 +20,7 @@ from agents.retrievers.utils.build_documents import (
 )
 
 from abc import ABC, abstractmethod
+import logging
 
 # ---------------------------------------------------------------------------
 # Helper decorator – unchanged except for typing tweaks
@@ -215,52 +216,56 @@ class TeamlyAPIWrapper(BaseModel, ABC):
 
     def get_documents_from_teamly_search(self, query: str) -> List[Document]:
         """Synchronous retrieval used by most LC components."""
-        raw_hits = self._semantic_search(query)[: self.k]
-        
-        # Group hits by space_id and article_id
-        grouped_hits = {}
-        for hit in raw_hits:
-            if hit["article_id"] == GLOSSARY_ARTICLE_ID:
-                continue
-            key = (hit["space_id"], hit["article_id"])
-            if key not in grouped_hits:
-                grouped_hits[key] = []
-            grouped_hits[key].append(hit)
-        
-        # Merge hits with same space_id and article_id
-        documents = []
-        for hits in grouped_hits.values():
-            if len(hits) == 1:
-                documents.append(self._to_document(hits[0]))
-            else:
-                # Merge multiple hits into one document
-                hits = sorted(hits, key=lambda x: x["offset"])
+        try:
+            raw_hits = self._semantic_search(query)[: self.k]
+            
+            # Group hits by space_id and article_id
+            grouped_hits = {}
+            for hit in raw_hits:
+                if hit["article_id"] == GLOSSARY_ARTICLE_ID:
+                    continue
+                key = (hit["space_id"], hit["article_id"])
+                if key not in grouped_hits:
+                    grouped_hits[key] = []
+                grouped_hits[key].append(hit)
+            
+            # Merge hits with same space_id and article_id
+            documents = []
+            for hits in grouped_hits.values():
+                if len(hits) == 1:
+                    documents.append(self._to_document(hits[0]))
+                else:
+                    # Merge multiple hits into one document
+                    hits = sorted(hits, key=lambda x: x["offset"])
 
-                merged_text = "\n\n".join(hit["text"] for hit in hits)
-                max_score = max(hit["score"] for hit in hits)
-                total_token_length = sum(hit["chunk_token_length"] for hit in hits)
-                total_length = sum(hit["length"] for hit in hits)
-                offsets = [hit["offset"] for hit in hits]
-                
-                # Use the first hit as base for metadata
-                base_hit = hits[0]
-                document = Document(
-                    page_content=f"{merged_text}\n\nСсылка на статью:https://kb.ileasing.ru/space/{base_hit['space_id']}/article/{base_hit['article_id']}",
-                    metadata={
-                        "docid": f"{base_hit['space_id']}_{base_hit['article_id']}_merged",
-                        "space_id": base_hit["space_id"],
-                        "article_id": base_hit["article_id"],
-                        "article_title": base_hit["article_title"],
-                        "score": max_score,
-                        "chunk_token_length": total_token_length,
-                        "offset": offsets,
-                        "length": total_length,
-                        "merged": True,  # Flag indicating this is a merged document
-                        "original_hits_count": len(hits),  # How many hits were merged
-                        "source": "semantic"
-                    },
-                )
-                documents.append(document)
+                    merged_text = "\n\n".join(hit["text"] for hit in hits)
+                    max_score = max(hit["score"] for hit in hits)
+                    total_token_length = sum(hit["chunk_token_length"] for hit in hits)
+                    total_length = sum(hit["length"] for hit in hits)
+                    offsets = [hit["offset"] for hit in hits]
+                    
+                    # Use the first hit as base for metadata
+                    base_hit = hits[0]
+                    document = Document(
+                        page_content=f"{merged_text}\n\nСсылка на статью:https://kb.ileasing.ru/space/{base_hit['space_id']}/article/{base_hit['article_id']}",
+                        metadata={
+                            "docid": f"{base_hit['space_id']}_{base_hit['article_id']}_merged",
+                            "space_id": base_hit["space_id"],
+                            "article_id": base_hit["article_id"],
+                            "article_title": base_hit["article_title"],
+                            "score": max_score,
+                            "chunk_token_length": total_token_length,
+                            "offset": offsets,
+                            "length": total_length,
+                            "merged": True,  # Flag indicating this is a merged document
+                            "original_hits_count": len(hits),  # How many hits were merged
+                            "source": "semantic"
+                        },
+                    )
+                    documents.append(document)
+        except Exception as e:
+            logging.error(f"Error occured at 'TeamlyAPIWrapper::get_documents_from_teamly_search'.\nException: {e}")
+            raise e
         return documents
 
     # ---------------------------------------------------------------------
@@ -269,8 +274,12 @@ class TeamlyAPIWrapper(BaseModel, ABC):
 
     @_authorization_wrapper
     def _post(self, url: str, payload: dict) -> dict:
-        resp = requests.post(f"{self.base_url}{url}", json=payload, headers=self._headers())
-        resp.raise_for_status()
+        try:
+            resp = requests.post(f"{self.base_url}{url}", json=payload, headers=self._headers())
+            resp.raise_for_status()
+        except Exception as e:
+            logging.error(f"Non-critical exception occured at 'TeamlyAPIWrapper::_post'.\nException: {e}\nResponse: {resp}")
+            raise e
         return resp.json()
 
     def _auth_post(self, url: str, payload: dict) -> str:
