@@ -25,7 +25,16 @@ class ThreadSettings():
 
     def is_allowed(self)-> bool:
         return config.CHECK_RIGHTS.strip().lower()!='true' or self.user_man.is_allowed(self.user_id)
+    
+    def is_admin(self)-> bool:
+        return self.user_man.is_admin(self.user_id)
 
+    def reload_users(self):
+        if self.is_admin():
+            self.user_man.load_users()
+            return True
+        return False
+        
     @property
     def assistant(self): 
         if self._assistant is None:

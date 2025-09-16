@@ -191,6 +191,15 @@ async def main() -> None:
         kb_update_thread.resume()
         await bot.send_message(chat_id, "База знаний обновлена.", parse_mode=None)
 
+    @dp.message(Command("users"))
+    async def cmd_users(message: types.Message) -> None:
+        chat_id = message.chat.id
+        user_id = message.from_user.username
+        if chat_id not in chats:
+            chats[chat_id] = ThreadSettings(user_id=user_id, chat_id=chat_id)
+        if chats[chat_id].reload_users():
+            await bot.send_message(chat_id, "База пользователей обновлена.", parse_mode=None)
+
     # Main message handler: text, voice, photo, document
     @dp.message(lambda m: m.content_type in {"text", "voice", "photo", "document"})
     async def handle_message(message: types.Message) -> None:
@@ -208,7 +217,11 @@ async def main() -> None:
                 chats[chat_id] = ThreadSettings(user_id=user_id, chat_id=chat_id)
 
             if not chats[chat_id].is_allowed():
-                bot.send_message(chat_id,'К сожалению, мне не разрешено помогать вам. Пожалуйста, обратитесь к администратору бота.')
+                await bot.send_message(
+                    chat_id,
+                    'К сожалению, мне не разрешено помогать вам. Пожалуйста, обратитесь к администратору бота.',
+                    parse_mode=None,
+                )
                 return
 
             # Build query from text/caption/voice
