@@ -4,6 +4,7 @@ from agents.state.state import ConfigSchema
 
 from user_manager.utils import UserManager
 from langchain_core.runnables import RunnableConfig
+import config
 
 class ThreadSettings():
     user_man = UserManager()
@@ -21,6 +22,9 @@ class ThreadSettings():
         self.user_id = user_id
         self.chat_id = chat_id
         self.role = ThreadSettings.user_man.get_role(user_id)
+
+    def is_allowed(self)-> bool:
+        return config.CHECK_RIGHTS.strip().lower()!='true' or self.user_man.is_allowed(self.user_id)
 
     @property
     def assistant(self): 

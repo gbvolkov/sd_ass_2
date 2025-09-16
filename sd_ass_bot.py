@@ -207,6 +207,10 @@ async def main() -> None:
             if chat_id not in chats:
                 chats[chat_id] = ThreadSettings(user_id=user_id, chat_id=chat_id)
 
+            if not chats[chat_id].is_allowed():
+                bot.send_message(chat_id,'К сожалению, мне не разрешено помогать вам. Пожалуйста, обратитесь к администратору бота.')
+                return
+
             # Build query from text/caption/voice
             query = message.text or getattr(message, "any_text", None) or (message.caption or "")
 
