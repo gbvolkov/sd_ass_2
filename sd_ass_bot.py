@@ -137,7 +137,7 @@ async def main() -> None:
         logging.exception(f"Unhandled exception occured: {exception}")
         return True
 
-    # /start — reset memory, greet
+    # /start — resets Ai agent's memory, greet
     @dp.message(Command("start"))
     async def cmd_start(message: types.Message) -> None:
         chat_id = message.chat.id
@@ -167,7 +167,7 @@ async def main() -> None:
             with contextlib.suppress(asyncio.CancelledError):
                 await typing_task
 
-    # /reset — reset memory only
+    # /reset — resets AI agent's memory only
     @dp.message(Command("reset"))
     async def cmd_reset(message: types.Message) -> None:
         chat_id = message.chat.id
@@ -182,15 +182,28 @@ async def main() -> None:
         )
         await bot.send_message(chat_id, "Память бота очищена.", parse_mode=None)
 
-    # /reload — refresh indexes
+    @dp.message(Command("help"))
+    async def cmd_help(message: types.Message) -> None:
+        chat_id = message.chat.id
+        with open("./help/help.md", encoding="utf-8") as f:
+            help_str = f.read()
+        await bot.send_message(chat_id, help_str, parse_mode="MarkdownV2")
+
+    # /reload — refreshes indexes
     @dp.message(Command("reload"))
     async def cmd_reload(message: types.Message) -> None:
         chat_id = message.chat.id
-        kb_update_thread.pause()
-        refresh_indexes()
-        kb_update_thread.resume()
-        await bot.send_message(chat_id, "База знаний обновлена.", parse_mode=None)
+        user_id = message.from_user.username
+        if chat_id not in chats:
+            chats[chat_id] = ThreadSettings(user_id=user_id, chat_id=chat_id)
+        if chats[chat_id].is_admin():
+            chat_id = message.chat.id
+            kb_update_thread.pause()
+            refresh_indexes()
+            kb_update_thread.resume()
+            await bot.send_message(chat_id, "База знаний обновлена.", parse_mode=None)
 
+    # /users — refreshes users rights
     @dp.message(Command("users"))
     async def cmd_users(message: types.Message) -> None:
         chat_id = message.chat.id
