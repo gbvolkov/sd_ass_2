@@ -167,6 +167,24 @@ async def main() -> None:
             with contextlib.suppress(asyncio.CancelledError):
                 await typing_task
 
+    def _set_model(message: types.Message, model: ModelType) -> None:
+        chat_id = message.chat.id
+        user_id = message.from_user.username
+        if chat_id not in chats:
+            chats[chat_id] = ThreadSettings(user_id=user_id, chat_id=chat_id)
+        chats[chat_id].model = model
+        chats[chat_id].assistant = None
+
+    # /sber — set model to Sber GIGAChat
+    @dp.message(Command("sber"))
+    async def cmd_sber(message: types.Message) -> None:
+        _set_model(message, ModelType.SBER)
+
+    # /gpt — set model to OpenAI GPT model
+    @dp.message(Command("gpt"))
+    async def cmd_gpt(message: types.Message) -> None:
+        _set_model(message, ModelType.GPT)
+
     # /reset — resets AI agent's memory only
     @dp.message(Command("reset"))
     async def cmd_reset(message: types.Message) -> None:

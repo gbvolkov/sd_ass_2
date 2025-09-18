@@ -9,6 +9,9 @@ from langchain_core.prompts import PromptTemplate
 from agents.llm_utils import get_llm
 
 class CheckResult(BaseModel):
+    """
+    Class containing result ()YES or NO) of a check and a reason whay the result is negative.
+    """
     result: str = Field(default=None, description = "YES or NO")
     reason: Optional[str] = Field(default=None, description="In case result is NO, put here short explanation why answer is incorrect. Otherwise leave if empty.")
 
@@ -16,7 +19,8 @@ with open("prompts/check_answer_prompt.txt", encoding="utf-8") as f:
     prompt_txt = f.read()
 
 prompt = PromptTemplate.from_template(prompt_txt)
-llm = get_llm("base")
+validation_provider = config.VALIDATION_LLM
+llm = get_llm(model="base", provider=validation_provider)
 #= ChatOpenAI(model="gpt-5", temperature=0)
 check_llm = llm.with_structured_output(CheckResult)
 check_chain = prompt | check_llm

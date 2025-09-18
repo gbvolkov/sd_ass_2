@@ -47,7 +47,7 @@ class ThreadSettings():
         self._assistant = assistant
 
     def get_config(self):
-        return RunnableConfig(ConfigSchema({"user_id": self.user_id, "user_role": self.role, "model": ModelType.GPT, "thread_id": self.chat_id}))
+        return RunnableConfig(ConfigSchema({"user_id": self.user_id, "user_role": self.role, "model": self.model, "thread_id": self.chat_id}))
     #   {
     #        "configurable": {
     #            # The user_id is used in our tools to

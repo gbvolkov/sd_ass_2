@@ -77,6 +77,7 @@ RETRIEVER_TYPE=os.environ.get('RETRIEVER_TYPE', "teamly")
 TEAM_GPT_MODEL=os.environ.get('TEAM_GPT_MODEL', "nano")
 
 LLM_PROVIDER=os.environ.get('LLM_PROVIDER', "openai")
+VALIDATION_LLM=os.environ.get('VALIDATION_LLM', "openai")
 BOT_MODE=os.environ.get('BOT_MODE', "polling")
 WEBHOOK_BASE=os.environ.get('WEBHOOK_BASE', "")
 WEBAPP_HOST=os.environ.get('WEBAPP_HOST', "")

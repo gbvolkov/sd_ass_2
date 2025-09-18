@@ -18,12 +18,12 @@ from agents.llm_utils import get_llm
 customize.strict_markdown = False
 
 class ModelType(Enum):
-    GPT = ("gpt", "GPT")
-    YA = ("ya", "YandexGPT")
-    SBER = ("sber", "Sber")
-    LOCAL = ("local", "Local")
+    GPT = ("openai", "GPT")
+    YA = ("yandex", "YandexGPT")
+    SBER = ("gigachat", "Sber")
+    #LOCAL = ("local", "Local")
     MISTRAL = ("mistral", "MistralAI")
-    GGUF = ("gguf", "GGUF")
+    #GGUF = ("gguf", "GGUF")
 
     def __init__(self, value, display_name):
         self._value_ = value

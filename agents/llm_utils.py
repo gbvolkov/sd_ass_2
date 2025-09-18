@@ -76,28 +76,28 @@ def get_model(provider: str, mode: str, config_path: str = "models.toml") -> str
 # model = get_model("openai", "mini")  # -> "gpt-4o-mini"
 
 def get_llm(
-        mode: str = "base", 
+        model: str = "base", 
         provider: str = None,
         temperature: Optional[float] = 0, 
         frequency_penalty: Optional[float] = None 
     ):
     if provider is None:
         provider = config.LLM_PROVIDER
-    model = get_model(provider, mode)
-    if config.LLM_PROVIDER == "openai":
-        return ChatOpenAI(model=model, temperature=temperature, frequency_penalty=frequency_penalty)
-    elif config.LLM_PROVIDER == "gigachat":
+    llm_model = get_model(provider, model)
+    if provider == "openai":
+        return ChatOpenAI(model=llm_model, temperature=temperature, frequency_penalty=frequency_penalty)
+    elif provider == "gigachat":
         return GigaChat(
             credentials=config.GIGA_CHAT_AUTH, 
-            model=model,
+            model=llm_model,
             verify_ssl_certs=False,
             temperature=temperature,
             frequency_penalty=frequency_penalty,
             scope = config.GIGA_CHAT_SCOPE)
-    elif config.LLM_PROVIDER == "mistral":
-        return ChatMistralAI(model="mistral-large-latest", temperature=temperature, frequency_penalty=frequency_penalty)
-    elif config.LLM_PROVIDER == "yandex":
-        model_name=f'gpt://{config.YA_FOLDER_ID}/{model}'
+    elif provider == "mistral":
+        return ChatMistralAI(model=llm_model, temperature=temperature, frequency_penalty=frequency_penalty)
+    elif provider == "yandex":
+        model_name=f'gpt://{config.YA_FOLDER_ID}/{llm_model}'
         return ChatYandexGPT(
             #iam_token = None,
             api_key = config.YA_API_KEY, 

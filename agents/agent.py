@@ -77,9 +77,10 @@ def augment_query(state: State, config: RunnableConfig) -> State:
     )
 
     # Add ONE additional system message
-    new_msgs = state["messages"] + [
-        SystemMessage(content=glossary)
-    ]
+    new_msgs = state["messages"] + (
+        [AIMessage(content=glossary)] 
+        if len(glossary.strip()) else []
+    )
     return {"messages": new_msgs}
 
 def route_request(state: State, config: RunnableConfig) -> str:
@@ -135,11 +136,12 @@ roles = {
     "default": "Provides answers to questions internal rules and features provided to Employees. Consults Interleasing Employees on any HR related questions."
 }
 
-def initialize_agent(model: ModelType = ModelType.GPT, role: str = "default", use_platform_store: bool = False):
+def initialize_agent(provider: ModelType = ModelType.GPT, role: str = "default", use_platform_store: bool = False):
     # The checkpointer lets the graph persist its state
     # this is a complete memory for the entire graph.
     memory = None if use_platform_store else MemorySaver()
-    team_llm = get_llm(config.TEAM_GPT_MODEL, temperature=1)
+    #team_llm = get_llm(config.TEAM_GPT_MODEL, temperature=1)
+    team_llm = get_llm(model = config.TEAM_GPT_MODEL, provider = provider.value, temperature=1)
     
     search_kb = get_search_tool()
     (lookup_term, lookup_abbreviation) = get_term_and_defition_tools()
@@ -286,7 +288,7 @@ if __name__ == "__main__":
 
     thread_id = str(uuid.uuid4())
 
-    config = {
+    cfg = {
         "configurable": {
             # The passenger_id is used in our flight tools to
             # fetch the user's flight information
@@ -296,10 +298,12 @@ if __name__ == "__main__":
         }
     }
 
+    assistant_graph.invoke({"messages": [HumanMessage(content=[{"type": "text", "text": "Кто ты?"}])]}, cfg)
+
     _printed = set()
     for question in tutorial_questions[:2]:
         events = assistant_graph.stream(
-            {"messages": [HumanMessage(content=[{"type": "text", "text": question}])]}, config, stream_mode="values"
+            {"messages": [HumanMessage(content=[{"type": "text", "text": question}])]}, cfg, stream_mode="values"
         )
         print("USER: ", question)
         print("-------------------")
@@ -311,14 +315,14 @@ if __name__ == "__main__":
 
     print("RESET")
     events = assistant_graph.invoke(
-        {"messages": [HumanMessage(content=[{"type": "reset", "text": "RESET"}])]}, config, stream_mode="values"
+        {"messages": [HumanMessage(content=[{"type": "reset", "text": "RESET"}])]}, cfg, stream_mode="values"
     )
     #for event in events:
     #    _print_response(event, _printed)
 
     for question in tutorial_questions[2:]:
         events = assistant_graph.stream(
-            {"messages": [HumanMessage(content=[{"type": "text", "text": question}])]}, config, stream_mode="values"
+            {"messages": [HumanMessage(content=[{"type": "text", "text": question}])]}, cfg, stream_mode="values"
         )
         print("USER: ", question)
         print("-------------------")
