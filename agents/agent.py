@@ -77,10 +77,10 @@ def augment_query(state: State, config: RunnableConfig) -> State:
     )
 
     # Add ONE additional system message
-    new_msgs = state["messages"] + (
+    new_msgs = (
         [AIMessage(content=glossary)] 
-        if len(glossary.strip()) else []
-    )
+        if len(glossary.strip()) 
+        else []) + state["messages"]
     return {"messages": new_msgs}
 
 def route_request(state: State, config: RunnableConfig) -> str:
