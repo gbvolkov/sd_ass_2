@@ -222,9 +222,11 @@ class TeamlyAPIWrapper(BaseModel, ABC):
             # Group hits by space_id and article_id
             grouped_hits = {}
             for hit in raw_hits:
-                if hit["article_id"] == GLOSSARY_ARTICLE_ID:
+                hit_type = hit["type"]
+
+                if hit_type == "article" and hit["source_id"] == GLOSSARY_ARTICLE_ID:
                     continue
-                key = (hit["space_id"], hit["article_id"])
+                key = (hit["container_id"], hit["source_id"], hit_type)
                 if key not in grouped_hits:
                     grouped_hits[key] = []
                 grouped_hits[key].append(hit)
@@ -246,20 +248,22 @@ class TeamlyAPIWrapper(BaseModel, ABC):
                     
                     # Use the first hit as base for metadata
                     base_hit = hits[0]
+                    hit_type = base_hit["type"]
                     document = Document(
-                        page_content=f"{merged_text}\n\nСсылка на статью:https://kb.ileasing.ru/space/{base_hit['space_id']}/article/{base_hit['article_id']}",
+                        page_content=f"{merged_text}\n\nСсылка на статью:https://kb.ileasing.ru/{base_hit['link']}",
                         metadata={
-                            "docid": f"{base_hit['space_id']}_{base_hit['article_id']}_merged",
-                            "space_id": base_hit["space_id"],
-                            "article_id": base_hit["article_id"],
-                            "article_title": base_hit["article_title"],
+                            "docid": f"{base_hit['container_id']}_{base_hit['source_id']}_{hit_type}_merged",
+                            "space_id": base_hit["container_id"],
+                            "article_id": base_hit["source_id"],
+                            "article_title": base_hit["title"],
                             "score": max_score,
                             "chunk_token_length": total_token_length,
                             "offset": offsets,
                             "length": total_length,
                             "merged": True,  # Flag indicating this is a merged document
                             "original_hits_count": len(hits),  # How many hits were merged
-                            "source": "semantic"
+                            "type": hit_type,
+                            "source": f"semantic"
                         },
                     )
                     documents.append(document)
@@ -379,18 +383,19 @@ class TeamlyAPIWrapper(BaseModel, ABC):
         }
         """
         return Document(
-            page_content=f"{hit["text"]}\n\nСсылка на статью:https://kb.ileasing.ru/space/{hit["space_id"]}/article/{hit["article_id"]}",
+            page_content=f"{hit["text"]}\n\nСсылка на статью:https://kb.ileasing.ru/{hit['link']}",
             metadata={
-                "docid": f"{hit['space_id']}_{hit['article_id']}_merged",
-                "space_id": hit["space_id"],
-                "article_id": hit["article_id"],
-                "article_title": hit["article_title"],
+                "docid": f"{hit['container_id']}_{hit['source_id']}_{hit['type']}_merged",
+                "space_id": hit["container_id"],
+                "article_id": hit["source_id"],
+                "article_title": hit["title"],
                 "score": hit["score"],
                 "chunk_token_length": hit["chunk_token_length"],
                 "offset": hit["offset"],
                 "length": hit["length"],
                 "merged": False,  # Flag indicating this is a merged document
                 "original_hits_count": 1,  # How many hits were merged
+                "type": hit['type'],
                 "source": "semantic"
             },
         )

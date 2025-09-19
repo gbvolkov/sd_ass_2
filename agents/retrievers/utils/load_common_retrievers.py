@@ -77,7 +77,7 @@ def buildMultiRetriever(index_paths: list[str], search_kwargs: dict, weights: li
         _multi_retrievers[index_paths] = retriever
     return retriever
 
-_MAX_TEAMLY_RETRIEVALS = 40
+_MAX_TEAMLY_RETRIEVALS = 20
 _MAX_RETRIEVALS = 3
 
 

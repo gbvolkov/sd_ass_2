@@ -22,7 +22,7 @@ def get_term_and_defition_tools(anonymizer: Palimpsest = None):
 
         The input must strictly follow these conventions:
         - Terms: singular nominative case (e.g., "server", "network", "лизинговая заявка").
-            Keep it in the language provided by user
+            Do not translate term to other language. Keep it as provided by user.
 
         Args:
             name (str): The term to look up.
@@ -55,7 +55,7 @@ def get_term_and_defition_tools(anonymizer: Palimpsest = None):
 
         The input must strictly follow these conventions:
         - Abbreviations: uppercase only (e.g., "HTTP", "NASA", "АД").
-            Keep it in the language provided by user.
+            Do not translate abbreviations to other language. Keep it as provided by user.
 
         Args:
             name (str): The abbreviation to look up.
