@@ -151,7 +151,7 @@ class TeamlyAPIWrapper(BaseModel, ABC):
     articles_json_path: str = ""
     articles_data_path: str = ""
     rename_map: dict = {}
-    k: int = 40
+    k: int = 20
     
     # ---------------------------------------------------------------------
     # Construction / auth helpers
