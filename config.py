@@ -33,6 +33,14 @@ GIGA_CHAT_SCOPE = "GIGACHAT_API_PERS"
 LANGCHAIN_API_KEY = os.environ.get('LANGCHAIN_API_KEY')
 #LANGCHAIN_API_KEY_DEV = os.environ.get('LANGCHAIN_API_KEY_DEV')
 LANGCHAIN_ENDPOINT = "https://api.smith.langchain.com"
+LANGSMITH_HIDE_INPUTS=True
+LANGSMITH_HIDE_OUTPUTS=True
+
+os.environ["LANGCHAIN_ENDPOINT"]=LANGCHAIN_ENDPOINT
+os.environ["LANGCHAIN_TRACING_V2"] = "true"
+os.environ["LANGSMITH_HIDE_INPUTS"] = "true"
+os.environ["LANGSMITH_HIDE_OUTPUTS"] = "true"
+
 
 OPENAI_API_KEY = os.environ.get('OPENAI_API_KEY')
 
@@ -90,3 +98,4 @@ MIN_RERANKER_RATIO=os.environ.get('MIN_RERANKER_RATIO', "0.25")
 MAX_TEAMLY_DOCS=int(os.environ.get('MAX_TEAMLY_DOCS', 20))
 
 USE_ANONIMIZER=(os.environ.get('USE_ANONIMIZER', "False").lower() == 'true')
+

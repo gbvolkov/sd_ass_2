@@ -4,10 +4,11 @@ import os
 from typing import List, Any
 from copy import copy
 
-os.environ["LANGCHAIN_ENDPOINT"]="https://api.smith.langchain.com"
-os.environ["LANGCHAIN_TRACING_V2"] = "true"
-
 import config
+
+#os.environ["LANGSMITH_HIDE_INPUTS"] = "true"
+#os.environ["LANGSMITH_HIDE_OUTPUTS"] = "true"
+
 
 from langgraph.checkpoint.memory import MemorySaver
 from langgraph.graph import END, StateGraph, START
