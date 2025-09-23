@@ -151,7 +151,7 @@ class TeamlyAPIWrapper(BaseModel, ABC):
     articles_json_path: str = ""
     articles_data_path: str = ""
     rename_map: dict = {}
-    k: int = 20
+    k: int = config.MAX_TEAMLY_DOCS
     
     # ---------------------------------------------------------------------
     # Construction / auth helpers
@@ -249,8 +249,13 @@ class TeamlyAPIWrapper(BaseModel, ABC):
                     # Use the first hit as base for metadata
                     base_hit = hits[0]
                     hit_type = base_hit["type"]
+                    pretty_link = ""
+                    if hit_type == "article":
+                        pretty_link = f"Ссылка на статью:https://kb.ileasing.ru/{base_hit['link']}"
+                    elif hit_type == "doc":
+                        pretty_link = f"Ссылка на документ:https://kb.ileasing.ru/api/v1/disk/{base_hit['link']}/view_pdf"
                     document = Document(
-                        page_content=f"{merged_text}\n\nСсылка на статью:https://kb.ileasing.ru/{base_hit['link']}",
+                        page_content=f"{merged_text}\n\n{pretty_link}",
                         metadata={
                             "docid": f"{base_hit['container_id']}_{base_hit['source_id']}_{hit_type}_merged",
                             "space_id": base_hit["container_id"],
@@ -382,20 +387,30 @@ class TeamlyAPIWrapper(BaseModel, ABC):
             "length": 1429
         }
         """
+        hit_type = hit['type']
+        pretty_link = ""
+        link = ""
+        if hit_type == "article":
+            link = f"https://kb.ileasing.ru/{hit['link']}"
+            pretty_link = f"Ссылка на статью:{link}"
+        elif hit_type == "doc":
+            link = f"https://kb.ileasing.ru/api/v1/disk/{hit['link']}/view_pdf"
+            pretty_link = f"Ссылка на документ:{link}"
         return Document(
-            page_content=f"{hit["text"]}\n\nСсылка на статью:https://kb.ileasing.ru/{hit['link']}",
+            page_content=f"{hit["text"]}\n\n{pretty_link}",
             metadata={
                 "docid": f"{hit['container_id']}_{hit['source_id']}_{hit['type']}_merged",
                 "space_id": hit["container_id"],
                 "article_id": hit["source_id"],
                 "article_title": hit["title"],
+                "link": link,
                 "score": hit["score"],
                 "chunk_token_length": hit["chunk_token_length"],
                 "offset": hit["offset"],
                 "length": hit["length"],
                 "merged": False,  # Flag indicating this is a merged document
                 "original_hits_count": 1,  # How many hits were merged
-                "type": hit['type'],
+                "type": hit_type,
                 "source": "semantic"
             },
         )

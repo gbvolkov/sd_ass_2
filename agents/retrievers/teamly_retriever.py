@@ -145,10 +145,11 @@ class TeamlyContextualCompressionRetriever(ContextualCompressionRetriever):
                 for doc in documents:
                     article_id = doc.metadata.get("article_id")
                     space_id = doc.metadata.get("space_id", "")
+                    link = doc.metadata.get("link", "")
                     source = doc.metadata.get("source", "")
                     doc_type = doc.metadata.get("type", "")
                     if article_id and source == "semantic" and doc_type == "article":
-                        doc.page_content = f"{self.base_retriever.wrapper.get_article(article_id)}\n\nСсылка на статью: {self.base_retriever.wrapper.base_url}/space/{space_id}/article/{article_id}"
+                        doc.page_content = f"{self.base_retriever.wrapper.get_article(article_id)}\n\nСсылка на статью: {link}"
         except Exception as e:
             logging.error(f"Error occured at 'TeamlyContextualCompressionRetriever::_get_relevant_documents'.\nException: {e}")
             raise e

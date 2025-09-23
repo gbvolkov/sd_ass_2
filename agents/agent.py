@@ -1,6 +1,8 @@
 
 import uuid
 import os
+from typing import List, Any
+from copy import copy
 
 os.environ["LANGCHAIN_ENDPOINT"]="https://api.smith.langchain.com"
 os.environ["LANGCHAIN_TRACING_V2"] = "true"
@@ -17,7 +19,7 @@ from langgraph.prebuilt import tools_condition
 #from agents.assistants.yandex_tools.yandex_tooling import ChatYandexGPTWithTools as ChatYandexGPT
 
 from langchain_core.messages.modifier import RemoveMessage
-from langchain_core.messages import HumanMessage, AIMessage, SystemMessage
+from langchain_core.messages import HumanMessage, AIMessage, SystemMessage, BaseMessage
 
 from langgraph_supervisor import create_supervisor
 from langgraph.prebuilt.chat_agent_executor import create_react_agent
@@ -39,6 +41,8 @@ from agents.retrievers.retriever import get_search_tool, get_tickets_search_tool
 from agents.llm_utils import get_llm
 
 from agents.augment_query import get_terms_and_definitions
+
+from palimpsest import Palimpsest
 
 import logging
 
@@ -136,9 +140,30 @@ roles = {
     "default": "Provides answers to questions internal rules and features provided to Employees. Consults Interleasing Employees on any HR related questions."
 }
 
+def anonymize_message_content(content: Any, anonymizer: Palimpsest) -> Any:
+    # Content can be str OR a list of "content parts" dicts.
+    if isinstance(content, str):
+        return anonymizer.anonimize(content)
+    if isinstance(content, list):
+        out = []
+        for part in content:
+            if isinstance(part, dict):
+                p = dict(part)
+                for key in ("text", "content", "input", "title", "caption", "markdown", "explanation"):
+                    if isinstance(p.get(key), str):
+                        p[key] = anonymizer.anonimize(p[key])
+                out.append(p)
+            else:
+                out.append(part)
+        return out
+    return content
+
 def initialize_agent(provider: ModelType = ModelType.GPT, role: str = "default", use_platform_store: bool = False):
     # The checkpointer lets the graph persist its state
     # this is a complete memory for the entire graph.
+    anonymizer = None
+    if config.USE_ANONIMIZER:
+        anonymizer = Palimpsest(True)
     memory = None if use_platform_store else MemorySaver()
     #team_llm = get_llm(config.TEAM_GPT_MODEL, temperature=1)
     team_llm = get_llm(model = config.TEAM_GPT_MODEL, provider = provider.value, temperature=1)
@@ -163,7 +188,16 @@ def initialize_agent(provider: ModelType = ModelType.GPT, role: str = "default",
         lookup_term,
         lookup_abbreviation
     ]
-        
+
+    def anonimize_request(state: State):
+        anon_msgs: List[BaseMessage] = []
+
+        for message in state["messages"]:
+            anon_msg = copy(message)
+            anon_msg.content=anonymize_message_content(message.content, anonymizer)
+            anon_msgs.append(anon_msg)
+        return {"llm_input_messages": anon_msgs}
+
     def get_validator(agent: str):
 
         if agent == "sd_agent":
@@ -188,12 +222,16 @@ def initialize_agent(provider: ModelType = ModelType.GPT, role: str = "default",
             last_message = messages[-1]
             if last_message.type != "ai" or len(last_message.tool_calls) > 0:
                 return state
+
             ai_answer = "No asnwer."
             for message in messages:
                 if message.type == "human":
                     queries.append(message.content[0]["text"])
             
             ai_answer = last_message.content
+            
+            if config.USE_ANONIMIZER:
+                last_message.content = anonymizer.deanonimize(last_message.content)
 
             summary_query = summarise_request(";".join(queries))
             result = vadildate_AI_answer(summary_query, ai_answer)
@@ -214,6 +252,7 @@ def initialize_agent(provider: ModelType = ModelType.GPT, role: str = "default",
         tools=search_tools + [search_tickets], 
         prompt=sd_prompt, 
         name="assistant_sd", 
+        pre_model_hook=anonimize_request,
         post_model_hook=get_validator("sd_agent"),
         state_schema = State, 
         checkpointer=memory, 
@@ -223,6 +262,7 @@ def initialize_agent(provider: ModelType = ModelType.GPT, role: str = "default",
         tools=search_tools, 
         prompt=sm_prompt, 
         name="assistant_sm", 
+        pre_model_hook=anonimize_request,
         post_model_hook=get_validator("sm_agent"),
         state_schema = State, 
         checkpointer=memory, 
@@ -232,6 +272,7 @@ def initialize_agent(provider: ModelType = ModelType.GPT, role: str = "default",
         tools=search_tools, 
         prompt=default_prompt, 
         name="assistant_default", 
+        pre_model_hook=anonimize_request,
         post_model_hook=get_validator("default_agent"),
         state_schema = State, 
         checkpointer=memory, 

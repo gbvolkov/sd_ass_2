@@ -12,7 +12,7 @@ from langchain.retrievers.multi_vector import MultiVectorRetriever
 from langchain.retrievers.contextual_compression import ContextualCompressionRetriever
 from langchain.storage import InMemoryByteStore
 
-from agents.retrievers.cross_encoder_reranker_with_score import CrossEncoderRerankerWithScores
+from agents.retrievers.cross_encoder_reranker_with_score import CrossEncoderRerankerWithScores, TournamentCrossEncoderReranker
 from agents.retrievers.utils.models_builder import (
     getEmbeddingModel,
     getRerankerModel,
@@ -33,7 +33,7 @@ _teamly_retriever_tickets_instance : Optional[TeamlyRetriever_Tickets] = None
 _teamly_retriever_glossary_instance : Optional[TeamlyRetriever_Glossary] = None
 
 _teamly_reranker_retriever: Optional[TeamlyContextualCompressionRetriever] = None
-_faiss_reranker_retriever: Optional[ContextualCompressionRetriever] = None
+_faiss_reranker_retriever: Optional[TournamentCrossEncoderReranker] = None
 
 _faiss_indexes = {}
 _multi_retrievers = {}
@@ -70,14 +70,19 @@ def buildMultiRetriever(index_paths: list[str], search_kwargs: dict, weights: li
         logging.info(f"loading multiretriever {paths_str}")
         ensemble = buildEnsembleRetriever(index_paths, search_kwargs, weights)
         reranker_model = getRerankerModel()
-        reranker = CrossEncoderRerankerWithScores(model=reranker_model, top_n=3, min_ratio=float(config.MIN_RERANKER_RATIO))
+        reranker = TournamentCrossEncoderReranker(
+            model=reranker_model, 
+            top_n=_MAX_RETRIEVALS, 
+            tournament_size=10,
+            min_ratio=float(config.MIN_RERANKER_RATIO)
+        )
         retriever = ContextualCompressionRetriever(
             base_compressor=reranker, base_retriever=ensemble
         )
         _multi_retrievers[index_paths] = retriever
     return retriever
 
-_MAX_TEAMLY_RETRIEVALS = 20
+_MAX_TEAMLY_RETRIEVALS = config.MAX_TEAMLY_DOCS
 _MAX_RETRIEVALS = 3
 
 
@@ -121,8 +126,15 @@ def buildTeamlyRetriever()-> TeamlyContextualCompressionRetriever:
         teamly_retriever = getTeamlyRetriever()
         reranker_model = getRerankerModel()
 
-        reranker = CrossEncoderRerankerWithScores(
-            model=reranker_model, top_n=_MAX_RETRIEVALS, 
+        #reranker = CrossEncoderRerankerWithScores(
+        #    model=reranker_model, 
+        #    top_n=_MAX_RETRIEVALS, 
+        #    min_ratio=float(config.MIN_RERANKER_RATIO)
+        #)
+        reranker = TournamentCrossEncoderReranker(
+            model=reranker_model, 
+            top_n=_MAX_RETRIEVALS, 
+            tournament_size=10,
             min_ratio=float(config.MIN_RERANKER_RATIO)
         )
         _teamly_reranker_retriever = TeamlyContextualCompressionRetriever(
@@ -152,11 +164,18 @@ def buildFAISSRetriever()-> ContextualCompressionRetriever:
         )
         multi_retriever.docstore.mset(list(zip(doc_ids, documents)))
         reranker_model = getRerankerModel()
-        reranker = CrossEncoderRerankerWithScores(
+        #reranker = CrossEncoderRerankerWithScores(
+        #    model=reranker_model, 
+        #   top_n=_MAX_RETRIEVALS, 
+        #    min_ratio=float(config.MIN_RERANKER_RATIO)
+        #)
+        reranker = TournamentCrossEncoderReranker(
             model=reranker_model, 
             top_n=_MAX_RETRIEVALS, 
+            tournament_size=10,
             min_ratio=float(config.MIN_RERANKER_RATIO)
         )
+
         _faiss_reranker_retriever = ContextualCompressionRetriever(
             base_compressor=reranker, 
             base_retriever=multi_retriever

@@ -86,3 +86,7 @@ WEBHOOK_PATH=os.environ.get('WEBHOOK_PATH', "")
 WEBHOOK_SECRET=os.environ.get('WEBHOOK_SECRET', "")
 
 MIN_RERANKER_RATIO=os.environ.get('MIN_RERANKER_RATIO', "0.25")
+
+MAX_TEAMLY_DOCS=int(os.environ.get('MAX_TEAMLY_DOCS', 20))
+
+USE_ANONIMIZER=(os.environ.get('USE_ANONIMIZER', "False").lower() == 'true')
