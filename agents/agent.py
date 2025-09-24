@@ -26,6 +26,7 @@ from langgraph_supervisor import create_supervisor
 from langgraph.prebuilt.chat_agent_executor import create_react_agent
 from langchain_community.tools import DuckDuckGoSearchRun
 from langchain_core.runnables import RunnableConfig
+from langchain_core.callbacks.file import FileCallbackHandler
 
 from agents.tools.yandex_search import YandexSearchTool
 
@@ -159,9 +160,12 @@ def anonymize_message_content(content: Any, anonymizer: Palimpsest) -> Any:
         return out
     return content
 
+import time
 def initialize_agent(provider: ModelType = ModelType.GPT, role: str = "default", use_platform_store: bool = False):
     # The checkpointer lets the graph persist its state
     # this is a complete memory for the entire graph.
+    log_name = f"sd_ass_{time.strftime("%Y%m%d%H%M")}"
+    log_handler = FileCallbackHandler(f"./logs/{log_name}")
     anonymizer = None
     if config.USE_ANONIMIZER:
         anonymizer = Palimpsest(True)
@@ -311,8 +315,7 @@ def initialize_agent(provider: ModelType = ModelType.GPT, role: str = "default",
         }
     )
     builder.add_edge("reset_memory", END)
-
-    return builder.compile(name="interleasing_qa_agent", checkpointer=memory)
+    return builder.compile(name="interleasing_qa_agent", checkpointer=memory).with_config({"collbacks": log_handler})
 
 
 if __name__ == "__main__":
