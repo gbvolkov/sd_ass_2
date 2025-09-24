@@ -251,9 +251,9 @@ class TeamlyAPIWrapper(BaseModel, ABC):
                     hit_type = base_hit["type"]
                     pretty_link = ""
                     if hit_type == "article":
-                        pretty_link = f"Ссылка на статью:https://kb.ileasing.ru/{base_hit['link']}"
+                        pretty_link = f"Ссылка на статью:https://kb.ileasing.ru{base_hit['link']}"
                     elif hit_type == "doc":
-                        pretty_link = f"Ссылка на документ:https://kb.ileasing.ru/api/v1/disk/{base_hit['link']}/view_pdf"
+                        pretty_link = f"Ссылка на документ:https://kb.ileasing.ru/api/v1/disk{base_hit['link']}/view_pdf"
                     document = Document(
                         page_content=f"{merged_text}\n\n{pretty_link}",
                         metadata={
@@ -391,10 +391,10 @@ class TeamlyAPIWrapper(BaseModel, ABC):
         pretty_link = ""
         link = ""
         if hit_type == "article":
-            link = f"https://kb.ileasing.ru/{hit['link']}"
+            link = f"https://kb.ileasing.ru{hit['link']}"
             pretty_link = f"Ссылка на статью:{link}"
         elif hit_type == "doc":
-            link = f"https://kb.ileasing.ru/api/v1/disk/{hit['link']}/view_pdf"
+            link = f"https://kb.ileasing.ru/api/v1/disk{hit['link']}/view_pdf"
             pretty_link = f"Ссылка на документ:{link}"
         return Document(
             page_content=f"{hit["text"]}\n\n{pretty_link}",

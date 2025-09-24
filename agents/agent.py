@@ -190,7 +190,7 @@ def initialize_agent(provider: ModelType = ModelType.GPT, role: str = "default",
         lookup_abbreviation
     ]
 
-    def anonimize_request(state: State):
+    def anonymize_request(state: State):
         anon_msgs: List[BaseMessage] = []
 
         for message in state["messages"]:
@@ -231,7 +231,7 @@ def initialize_agent(provider: ModelType = ModelType.GPT, role: str = "default",
             
             ai_answer = last_message.content
             
-            if config.USE_ANONIMIZER:
+            if anonymizer:
                 last_message.content = anonymizer.deanonimize(last_message.content)
 
             summary_query = summarise_request(";".join(queries))
@@ -253,7 +253,7 @@ def initialize_agent(provider: ModelType = ModelType.GPT, role: str = "default",
         tools=search_tools + [search_tickets], 
         prompt=sd_prompt, 
         name="assistant_sd", 
-        pre_model_hook=anonimize_request,
+        pre_model_hook=anonymize_request if anonymizer else None,
         post_model_hook=get_validator("sd_agent"),
         state_schema = State, 
         checkpointer=memory, 
@@ -263,7 +263,7 @@ def initialize_agent(provider: ModelType = ModelType.GPT, role: str = "default",
         tools=search_tools, 
         prompt=sm_prompt, 
         name="assistant_sm", 
-        pre_model_hook=anonimize_request,
+        pre_model_hook=anonymize_request if anonymizer else None,
         post_model_hook=get_validator("sm_agent"),
         state_schema = State, 
         checkpointer=memory, 
@@ -273,7 +273,7 @@ def initialize_agent(provider: ModelType = ModelType.GPT, role: str = "default",
         tools=search_tools, 
         prompt=default_prompt, 
         name="assistant_default", 
-        pre_model_hook=anonimize_request,
+        pre_model_hook=anonymize_request if anonymizer else None,
         post_model_hook=get_validator("default_agent"),
         state_schema = State, 
         checkpointer=memory, 
