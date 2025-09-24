@@ -315,7 +315,7 @@ def initialize_agent(provider: ModelType = ModelType.GPT, role: str = "default",
         }
     )
     builder.add_edge("reset_memory", END)
-    return builder.compile(name="interleasing_qa_agent", checkpointer=memory).with_config({"collbacks": log_handler})
+    return builder.compile(name="interleasing_qa_agent", checkpointer=memory).with_config({"callbacks": log_handler})
 
 
 if __name__ == "__main__":
