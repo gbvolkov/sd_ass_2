@@ -1,6 +1,7 @@
 import json
 from pathlib import Path
 import pandas as pd
+import datetime
 
 def get_data_from_json(data: str, space_id: str, article_id: str, article_title: str, rename_map: dict):
     # ---------- helpers ----------
@@ -105,3 +106,73 @@ def get_glossary_data(data: dict, space_id: str, article_id: str, article_title:
     df[["space_id", "article_id", "article_title"]] = (space_id, article_id, article_title)
 
     return df
+
+def _normalize_value(val, typ):
+    if val is None:
+        return None
+
+    if typ == "title":
+        if isinstance(val, dict):
+            return val.get("text") or val.get("title") or json.dumps(val, ensure_ascii=False)
+        return val
+
+    if typ == "date":
+        if isinstance(val, dict):
+            raw = val.get("from") or val.get("start") or val.get("value")
+            if raw:
+                try:
+                    dt = datetime.fromisoformat(raw)
+                    return dt.date().isoformat() if val.get("withTime") is False else dt.isoformat()
+                except Exception:
+                    return raw
+            return None
+        return val
+
+    if typ == "person":
+        if isinstance(val, dict):
+            return val.get("fullName") or val.get("name") or json.dumps(val, ensure_ascii=False)
+        if isinstance(val, list):
+            return ", ".join(v.get("fullName") if isinstance(v, dict) else str(v) for v in val)
+        return str(val)
+
+    if isinstance(val, dict):
+        if "text" in val: return val["text"]
+        if "name" in val: return val["name"]
+        return json.dumps(val, ensure_ascii=False)
+
+    if isinstance(val, list):
+        return ", ".join(json.dumps(v, ensure_ascii=False) if isinstance(v, (dict, list)) else str(v) for v in val)
+
+    return val
+
+#transforms smart table content into dataframe
+def get_st_data(payload):
+    """
+    Returns a wide DataFrame: one row per content item,
+    columns are the name values from schemaProperties.
+    """
+    schema = payload.get("schemaProperties") or []
+    # Preserve schema order
+    names_in_order = [p.get("name") for p in schema] + ["id", "st_id"]
+    code_to_name = {p["code"]: p.get("name") for p in schema}
+    name_to_type = {p.get("name"): p.get("type") for p in schema}
+    st_id = payload["container"]["id"]
+
+    rows = []
+    for item in payload.get("content") or []:
+        article = (item or {}).get("article") or {}
+        props_outer = article.get("properties") or {}
+        props = props_outer.get("properties") if isinstance(props_outer, dict) else {}
+
+        row = {name: None for name in names_in_order}
+        row["id"] = article["id"]
+        row["st_id"] = st_id
+        for code, raw_val in (props or {}).items():
+            name = code_to_name.get(code)
+            if not name:
+                continue  # ignore fields not in the schema
+            typ = name_to_type.get(name)
+            row[name] = _normalize_value(raw_val, typ)
+        rows.append(row)
+
+    return pd.DataFrame(rows, columns=names_in_order)

@@ -12,7 +12,11 @@ import config
 
 from langchain.schema import Document
 
-from agents.retrievers.utils.load_table import get_data_from_json, get_glossary_data
+from agents.retrievers.utils.load_table import (
+    get_data_from_json
+    , get_glossary_data
+    , get_st_data
+)
 from agents.retrievers.utils.build_documents import (
     get_documents_for_sd_qa
     , get_documents_for_sd_tickets
@@ -33,7 +37,8 @@ def _authorization_wrapper(func):
         try:
             return func(self, *args, **kwargs)
         except requests.HTTPError as http_err:
-            if http_err.response.status_code != 401:
+            #TODO!!! After Teamly fix, remove 500 error from here!
+            if http_err.response.status_code not in [401, 500]:
                 raise
             # token may have expired → refresh & retry once
             self.auth_code = self._get_token()
@@ -123,7 +128,11 @@ def _get_article_text(base_url: str, article_info: Dict) -> str:
 # Main retriever
 # ---------------------------------------------------------------------------
 
-GLOSSARY_ARTICLE_ID="91c22083-a2cc-4928-bfad-5925b2da021f"
+GLOSSARY_ARTICLE_IDS=[
+    "91c22083-a2cc-4928-bfad-5925b2da021f"
+    , "edf2f482-f2a6-46ac-91df-1da136a5d3ef"
+    , "fc5c69d0-0f39-4f6f-a8f8-5ba2ba592866"
+    , "6e2d33ed-094d-4261-9aa9-058d56994ead"]
 
 class TeamlyAPIWrapper(BaseModel, ABC):
     """
@@ -195,20 +204,23 @@ class TeamlyAPIWrapper(BaseModel, ABC):
     def parse_json(self, data: str, space_id: str, article_id: str, article_title: str):
         return get_data_from_json(data, space_id, article_id, article_title, self.rename_map)
 
+    def _get_article_data(self, article_id: str)-> pd.DataFrame:
+        article_info = self.get_article_info(article_id)
+        space_id = article_info["space_id"]
+        article_title = article_info["title"]
+        raw_doc = article_info["editorContentObject"]["content"]
+        doc = json.loads(raw_doc)
+        return self.parse_json(doc, space_id, article_id, article_title)
+
     def _load_sd_documents(self):
         if config.RETRIEVER_TYPE == "teamly":
             with open (self.articles_json_path, "r") as f:
                 articles = json.load(f)
             df = pd.DataFrame()
             for article_id in articles["articles"]:
-                article_info = self.get_article_info(article_id)
-                space_id = article_info["space_id"]
-                article_title = article_info["title"]
-                raw_doc = article_info["editorContentObject"]["content"]
-                doc = json.loads(raw_doc)
-                article_df = self.parse_json(doc, space_id, article_id, article_title)
+                article_df = self._get_article_data(article_id)
                 df = pd.concat([df, article_df], ignore_index=True)
-            self.sd_documents = self.get_documents(df)
+            self.sd_documents = self.get_documents(df) 
         else:
             with open(self.articles_data_path, "r", encoding="utf-8") as f:
                 docs_json = json.load(f)
@@ -224,7 +236,7 @@ class TeamlyAPIWrapper(BaseModel, ABC):
             for hit in raw_hits:
                 hit_type = hit["type"]
 
-                if hit_type == "article" and hit["source_id"] == GLOSSARY_ARTICLE_ID:
+                if hit_type == "article" and hit["source_id"] in GLOSSARY_ARTICLE_IDS:
                     continue
                 key = (hit["container_id"], hit["source_id"], hit_type)
                 if key not in grouped_hits:
@@ -310,8 +322,9 @@ class TeamlyAPIWrapper(BaseModel, ABC):
     # token endpoints -----------------------------------------------------
 
     def _refresh_token(self) -> str:
+        url = f"{self.base_url}/api/v1/auth/integration/refresh"
         return self._auth_post(
-            f"{self.base_url}/api/v1/auth/integration/refresh",
+            url,
             {
                 "client_id":     self.client_id,
                 "client_secret": self.client_secret,
@@ -320,8 +333,9 @@ class TeamlyAPIWrapper(BaseModel, ABC):
         )
 
     def _authorise(self) -> str:
+        url = f"{self.base_url}/api/v1/auth/integration/authorize"
         return self._auth_post(
-            f"{self.base_url}/api/v1/auth/integration/authorize",
+            url,
             {
                 "client_id":     self.client_id,
                 "client_secret": self.client_secret,
@@ -342,17 +356,19 @@ class TeamlyAPIWrapper(BaseModel, ABC):
 
     def _semantic_search(self, query: str) -> list[dict]:
         """Raw semantic search – returns the provider’s JSON hits."""
+        url = "/api/v1/semantic/external/search"
         payload = {
             "query": query,
             "limit_count": self.k
         }
-        return self._post("/api/v1/semantic/external/search", payload)
+        return self._post(url, payload)
 
     def get_article(self, article_id: str, max_length: int = 0) -> str:
         article_info = self.get_article_info(article_id, max_length)
         return _get_article_text(self.base_url, article_info)
 
     def get_article_info(self, article_id: str, max_length: int = 0) -> str:
+        url = "/api/v1/wiki/ql/article"
         payload = {
             "query": {
                 "__filter": {
@@ -366,8 +382,46 @@ class TeamlyAPIWrapper(BaseModel, ABC):
                 }                
             }
         }
-        return self._post("/api/v1/wiki/ql/article", payload)
-    
+        return self._post(url, payload)
+
+    def get_smart_table(self, st_id: str) -> str:
+        url = "/api/v1/ql/content-database/content"
+
+        payload = {
+            "query": {
+                "__filter": {
+                            "contentDatabaseId": st_id
+                        },
+                "id": True,
+                "title": True,
+                "container": {
+                    "id": True,
+                },
+                "schemaProperties": {
+                    "id": True,
+                    "spaceId": True,
+                    "propertyId": True,
+                    "name": True,
+                    "type": True,
+                    "code": True
+                },
+                "content": {
+                    "article": {
+                        "id": True,
+                        "properties": {
+                            "properties": True
+                        }
+                    },
+                    "hasNested": True
+                },            
+            }
+        }
+        return self._post(url, payload)  
+
+    def get_smart_table_content(self, st_id: str):
+        row_content = self.get_smart_table(st_id)
+        return get_st_data(row_content)
+
     def _to_document(self, hit: dict) -> Document:
         """
         Convert one semantic-search hit (see sample payload below) into a
@@ -441,6 +495,13 @@ class TeamlyAPIWrapper_SD_Tickets(TeamlyAPIWrapper):
     }
     articles_json_path: str = "./data/sd_tickets.json"
     articles_data_path: str = "./data/tickets_data.json"
+
+
+    def _get_article_data(self, article_id: str)-> pd.DataFrame:
+        row_content = self.get_smart_table(article_id)
+        return get_st_data(row_content)
+        
+
     def get_documents(self, df: pd.DataFrame) -> list[Document]:
         return get_documents_for_sd_tickets(df)
 

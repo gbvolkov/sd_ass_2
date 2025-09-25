@@ -9,7 +9,7 @@ import config
 class ThreadSettings():
     user_man = UserManager()
 
-    def __init__(self, user_id, chat_id, model=ModelType.GPT):
+    def __init__(self, user_id, chat_id, model=ModelType.SBER if config.LLM_PROVIDER == "gigachat" else "openai"):
         self.model=model
         self.question = ''
         self.answer = ''
@@ -38,7 +38,7 @@ class ThreadSettings():
     @property
     def assistant(self): 
         if self._assistant is None:
-            self._assistant = initialize_agent(self.model, self.role)
+            self._assistant = initialize_agent(provider=self.model, role=self.role)
 
         return self._assistant
     

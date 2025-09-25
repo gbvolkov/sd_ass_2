@@ -33,24 +33,24 @@ def get_documents_for_sd_tickets(df: pd.DataFrame) -> list[Document]:
     for _, row in df.iterrows():
         # Combine relevant fields into the page_content for retrieval
         content = (
-            f"Ticket number: {row['ticket_no']}\n"
-            f"Ticket topic: {row['topic']}\n"
-            f"Problem: {row['problem']}\n\n"
-            f"Solution: {row['solution']}\n\n"
-            f"Ссылка на статью:https://kb.ileasing.ru/space/{row['space_id']}/article/{row['article_id']}"
+            f"Ticket number: {row["Тикет"]}\n"
+            f"Ticket topic: {row["Тема"]}\n"
+            f"Problem: {row["Описание текст"]}\n\n"
+            f"Solution: {row["Описание решения"]}\n\n"
+            f"Ссылка на статью:https://kb.ileasing.ru/space/{row['st_id']}/article/{row['id']}"
         )
         doc = Document(
             page_content=content,
             metadata={
-                "ticket_no": row["ticket_no"],
-                "topic": row["topic"],
-                "ticket_dt": row["ticket_dt"],
-                "ticket_type": row["ticket_type"],
-                "problem": row["problem"],
-                "solution": row["solution"],
-                "space_id": row["space_id"],
-                "article_id": row["article_id"],
-                "article_title": row["article_title"],
+                "ticket_no": row["Тикет"],
+                "topic": row["Тема"],
+                "ticket_dt": row["Дата регистрации"],
+                "ticket_type": row["Критерий ошибки"],
+                "problem": row["Описание текст"],
+                "solution": row["Описание решения"],
+                "space_id": row["st_id"],
+                "article_id": row["id"],
+                "article_title": row["Тема"],
                 "source": "sd_tickets_table"
             }
         )

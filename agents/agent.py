@@ -171,7 +171,7 @@ def initialize_agent(provider: ModelType = ModelType.GPT, role: str = "default",
         anonymizer = Palimpsest(True)
     memory = None if use_platform_store else MemorySaver()
     #team_llm = get_llm(config.TEAM_GPT_MODEL, temperature=1)
-    team_llm = get_llm(model = config.TEAM_GPT_MODEL, provider = provider.value, temperature=1)
+    team_llm = get_llm(model = config.TEAM_GPT_MODEL, provider = provider.value, temperature=0.4)
     
     search_kb = get_search_tool()
     (lookup_term, lookup_abbreviation) = get_term_and_defition_tools()
@@ -315,7 +315,7 @@ def initialize_agent(provider: ModelType = ModelType.GPT, role: str = "default",
         }
     )
     builder.add_edge("reset_memory", END)
-    return builder.compile(name="interleasing_qa_agent", checkpointer=memory).with_config({"callbacks": log_handler})
+    return builder.compile(name="interleasing_qa_agent", checkpointer=memory).with_config({"callbacks": [log_handler]})
 
 
 if __name__ == "__main__":
