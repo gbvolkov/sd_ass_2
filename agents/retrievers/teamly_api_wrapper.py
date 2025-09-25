@@ -83,13 +83,13 @@ def _get_article_text(base_url: str, article_info: Dict) -> str:
                             #    url = f" {self.base_url}{url}"
                             if not url.startswith("https:") and not url.startswith("mailto:"):
                                 url = base_url + url
-                            pieces.append(f" {url}")
+                            pieces.append(f" {url} ")
                     elif mark.get("type") in {"media"}:
                         url = mark.get("attrs", {}).get("src")
                         if url and isinstance(url, str) and not url.startswith("data:"):
                             if not url.startswith("https:"):
                                 url = base_url + url
-                            pieces.append(f" {url}")
+                            pieces.append(f" {url} ")
 
             # ---  dedicated url / link nodes ------------------------------------
             elif ntype in {"url", "link"}:
@@ -101,7 +101,7 @@ def _get_article_text(base_url: str, article_info: Dict) -> str:
                     #    url = f" {self.base_url}{url}"
                     if not url.startswith("https:") and not url.startswith("mailto:"):
                         url = base_url + url
-                    pieces.append(f" {url}")
+                    pieces.append(f" {url} ")
 
             # ---  dedicated url / link nodes ------------------------------------
             elif ntype in {"media"}:
@@ -109,7 +109,7 @@ def _get_article_text(base_url: str, article_info: Dict) -> str:
                 if url and isinstance(url, str) and not url.startswith("data:"):
                     if not url.startswith("https:") and not url.startswith("mailto:"):
                         url = base_url + url
-                    pieces.append(f" {url}")
+                    pieces.append(f" {url} ")
 
             # ---  newline after a paragraph -------------------------------------
             elif ntype == "paragraph":

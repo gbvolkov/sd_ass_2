@@ -169,7 +169,18 @@ def initialize_agent(provider: ModelType = ModelType.GPT, role: str = "default",
     log_handler = FileCallbackHandler(f"./logs/{log_name}")
     anonymizer = None
     if config.USE_ANONIMIZER:
-        anonymizer = Palimpsest(True)
+        anon_entities = [
+            "RU_PERSON"
+            ,"CREDIT_CARD"
+            ,"PHONE_NUMBER"
+            ,"IP_ADDRESS"
+            ,"URL"
+            ,"RU_PASSPORT"
+            ,"SNILS"
+            ,"INN"
+            ,"RU_BANK_ACC"
+        ]
+        anonymizer = Palimpsest(verbose=False, run_entities=anon_entities)
     memory = None if use_platform_store else MemorySaver()
     #team_llm = get_llm(config.TEAM_GPT_MODEL, temperature=1)
     team_llm = get_llm(model = config.TEAM_GPT_MODEL, provider = provider.value, temperature=0.4)
