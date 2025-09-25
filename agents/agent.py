@@ -56,8 +56,10 @@ from prompts.prompts import (
     sd_agent_web_prompt, 
     sm_agent_web_prompt, 
     default_search_web_prompt)
+import time
 
-logger = logging.getLogger(__name__)
+ANON_LOG_NAME = f"LLM_requests_log_{time.strftime("%Y%m%d%H%M")}"
+
 
 def reset_or_run(state: State, config: RunnableConfig) -> str:
     if state["messages"][-1].content[0].get("type") == "reset":
@@ -160,7 +162,6 @@ def anonymize_message_content(content: Any, anonymizer: Palimpsest) -> Any:
         return out
     return content
 
-import time
 def initialize_agent(provider: ModelType = ModelType.GPT, role: str = "default", use_platform_store: bool = False):
     # The checkpointer lets the graph persist its state
     # this is a complete memory for the entire graph.
@@ -196,11 +197,14 @@ def initialize_agent(provider: ModelType = ModelType.GPT, role: str = "default",
 
     def anonymize_request(state: State):
         anon_msgs: List[BaseMessage] = []
-
-        for message in state["messages"]:
-            anon_msg = copy(message)
-            anon_msg.content=anonymize_message_content(message.content, anonymizer)
-            anon_msgs.append(anon_msg)
+        
+        with open(f"./logs/{ANON_LOG_NAME}", "a", encoding="utf-8") as f:
+            for message in state["messages"]:
+                anon_msg = copy(message)
+                f.write(f"BEFORE ANONIMIZATION:\n{anon_msg.content}\n")
+                anon_msg.content=anonymize_message_content(message.content, anonymizer)
+                f.write(f"AFTER ANONIMIZATION:\n{anon_msg.content}\n\n")
+                anon_msgs.append(anon_msg)
         return {"llm_input_messages": anon_msgs}
 
     def get_validator(agent: str):
@@ -236,7 +240,10 @@ def initialize_agent(provider: ModelType = ModelType.GPT, role: str = "default",
             ai_answer = last_message.content
             
             if anonymizer:
-                last_message.content = anonymizer.deanonimize(last_message.content)
+                with open(f"./logs/{ANON_LOG_NAME}", "a", encoding="utf-8") as f:
+                    f.write(f"BEFORE DEANONIMIZATION:\n{last_message.content}\n")
+                    last_message.content = anonymizer.deanonimize(last_message.content)
+                    f.write(f"AFTER DEANONIMIZATION:\n{last_message.content}\n\n")
 
             summary_query = summarise_request(";".join(queries))
             result = vadildate_AI_answer(summary_query, ai_answer)

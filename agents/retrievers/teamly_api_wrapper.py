@@ -132,7 +132,10 @@ GLOSSARY_ARTICLE_IDS=[
     "91c22083-a2cc-4928-bfad-5925b2da021f"
     , "edf2f482-f2a6-46ac-91df-1da136a5d3ef"
     , "fc5c69d0-0f39-4f6f-a8f8-5ba2ba592866"
-    , "6e2d33ed-094d-4261-9aa9-058d56994ead"]
+    , "6e2d33ed-094d-4261-9aa9-058d56994ead"
+    , "685fda38-24f0-4560-8afc-a623535b5a8a"
+    , "ff5a5245-8f6d-4e29-af09-35acd6245e2e"
+]
 
 class TeamlyAPIWrapper(BaseModel, ABC):
     """
