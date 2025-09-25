@@ -179,6 +179,7 @@ def initialize_agent(provider: ModelType = ModelType.GPT, role: str = "default",
             ,"SNILS"
             ,"INN"
             ,"RU_BANK_ACC"
+            ,"TICKET_NUMBER"
         ]
         anonymizer = Palimpsest(verbose=False, run_entities=anon_entities)
     memory = None if use_platform_store else MemorySaver()

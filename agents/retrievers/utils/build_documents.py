@@ -37,7 +37,7 @@ def get_documents_for_sd_tickets(df: pd.DataFrame) -> list[Document]:
             f"Ticket topic: {row["Тема"]}\n"
             f"Problem: {row["Описание текст"]}\n\n"
             f"Solution: {row["Описание решения"]}\n\n"
-            f"Ссылка на статью:https://kb.ileasing.ru/space/{row['st_id']}/article/{row['id']}"
+            f"Ссылка на тикет: https://kb.ileasing.ru/space/{row['st_id']}/article/{row['id']}"
         )
         doc = Document(
             page_content=content,
