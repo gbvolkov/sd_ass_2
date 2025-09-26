@@ -47,3 +47,5 @@ spacy
 scispacy
 rank_bm25
 pymorphy2
+
+langfuse

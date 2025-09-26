@@ -100,3 +100,6 @@ MIN_RERANKER_RATIO=os.environ.get('MIN_RERANKER_RATIO', "0.25")
 MAX_TEAMLY_DOCS=int(os.environ.get('MAX_TEAMLY_DOCS', 20))
 
 
+LANGFUSE_SECRET=os.environ.get('LANGFUSE_SECRET', "")
+LANGFUSE_PUBLIC=os.environ.get('LANGFUSE_PUBLIC', "")
+LANGFUSE_URL=os.environ.get('LANGFUSE_URL', "")

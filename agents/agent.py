@@ -26,7 +26,13 @@ from langgraph_supervisor import create_supervisor
 from langgraph.prebuilt.chat_agent_executor import create_react_agent
 from langchain_community.tools import DuckDuckGoSearchRun
 from langchain_core.runnables import RunnableConfig
-from langchain_core.callbacks.file import FileCallbackHandler
+#from langchain_core.callbacks.file import FileCallbackHandler
+
+from langfuse import Langfuse
+from langfuse.langchain import CallbackHandler
+
+from utils.llm_logger import JSONFileTracer
+
 
 from agents.tools.yandex_search import YandexSearchTool
 
@@ -115,7 +121,9 @@ def reset_memory(state: State) -> State:
     all_msg_ids = [m.id for m in state["messages"]]
     # Returning RemoveMessage instances instructs the reducer to delete them
     return {
-        "messages": [RemoveMessage(id=mid) for mid in all_msg_ids]
+        "messages": [RemoveMessage(id=mid) for mid in all_msg_ids],
+        "verification_result": "",
+        "verification_reason": ""
     }
 
 def get_role_agent(model: ModelType = ModelType.GPT, role: str = "default"):
@@ -166,7 +174,18 @@ def initialize_agent(provider: ModelType = ModelType.GPT, role: str = "default",
     # The checkpointer lets the graph persist its state
     # this is a complete memory for the entire graph.
     log_name = f"sd_ass_{time.strftime("%Y%m%d%H%M")}"
-    log_handler = FileCallbackHandler(f"./logs/{log_name}")
+    #log_handler = FileCallbackHandler(f"./logs/{log_name}")
+    json_handler = JSONFileTracer(f"./logs/{log_name}")
+    callback_handlers = [json_handler]
+    if config.LANGFUSE_URL and len(config.LANGFUSE_URL) > 0:
+        langfuse = Langfuse(
+            public_key=config.LANGFUSE_PUBLIC,
+            secret_key=config.LANGFUSE_SECRET,
+            host=config.LANGFUSE_URL
+        )
+        lf_handler = CallbackHandler()
+        callback_handlers += [lf_handler]
+
     anonymizer = None
     if config.USE_ANONIMIZER:
         anon_entities = [
@@ -267,6 +286,8 @@ def initialize_agent(provider: ModelType = ModelType.GPT, role: str = "default",
                         "verification_result": result.result,
                         "verification_reason": result.reason}
             else:
+                state.update({"verification_result": result.result,
+                              "verification_reason": result.reason})
                 return state
 
         return validate_answer
@@ -334,7 +355,7 @@ def initialize_agent(provider: ModelType = ModelType.GPT, role: str = "default",
         }
     )
     builder.add_edge("reset_memory", END)
-    return builder.compile(name="interleasing_qa_agent", checkpointer=memory).with_config({"callbacks": [log_handler]})
+    return builder.compile(name="interleasing_qa_agent", checkpointer=memory).with_config({"callbacks": callback_handlers})
 
 
 if __name__ == "__main__":

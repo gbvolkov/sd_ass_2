@@ -34,13 +34,14 @@ class PeriodicTask:
         self.thread.start()
 
     def resume(self):
-        self.lock.acquire(blocking=True)
-        self.paused = False
-        self.lock.release()
+        self._pause(False)
 
     def pause(self):
+        self._pause(True)
+
+    def _pause(self, bpause):
         self.lock.acquire(blocking=True)
-        self.paused = True
+        self.paused = bpause
         self.lock.release()
 
     def stop(self):
