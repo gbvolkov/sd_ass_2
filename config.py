@@ -30,9 +30,9 @@ GIGA_CHAT_SECRET = os.environ.get('GIGA_CHAT_SECRET')
 GIGA_CHAT_AUTH = os.environ.get('GIGA_CHAT_AUTH')
 GIGA_CHAT_SCOPE = "GIGACHAT_API_PERS"
 
-LANGCHAIN_API_KEY = os.environ.get('LANGCHAIN_API_KEY')
+LANGCHAIN_API_KEY = os.environ.get('LANGCHAIN_API_KEY', "")
 #LANGCHAIN_API_KEY_DEV = os.environ.get('LANGCHAIN_API_KEY_DEV')
-LANGCHAIN_ENDPOINT = "https://api.smith.langchain.com"
+LANGCHAIN_ENDPOINT = "" #"https://api.smith.langchain.com"
 USE_ANONIMIZER=(os.environ.get('USE_ANONIMIZER', "False").lower() == 'true')
 if USE_ANONIMIZER:
     LANGSMITH_HIDE_INPUTS=True
@@ -40,8 +40,8 @@ if USE_ANONIMIZER:
     os.environ["LANGSMITH_HIDE_INPUTS"] = "true"
     os.environ["LANGSMITH_HIDE_OUTPUTS"] = "true"
 
-os.environ["LANGCHAIN_ENDPOINT"]=LANGCHAIN_ENDPOINT
-os.environ["LANGCHAIN_TRACING_V2"] = "true"
+#os.environ["LANGCHAIN_ENDPOINT"]=LANGCHAIN_ENDPOINT
+#os.environ["LANGCHAIN_TRACING_V2"] = "true"
 
 
 OPENAI_API_KEY = os.environ.get('OPENAI_API_KEY')
