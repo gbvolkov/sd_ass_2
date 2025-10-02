@@ -148,8 +148,12 @@ class TeamlyContextualCompressionRetriever(ContextualCompressionRetriever):
                     link = doc.metadata.get("link", "")
                     source = doc.metadata.get("source", "")
                     doc_type = doc.metadata.get("type", "")
-                    if article_id and source == "semantic" and doc_type == "article":
-                        doc.page_content = f"{self.base_retriever.wrapper.get_article(article_id)}\n\nСсылка на статью: {link}"
+                    try:
+                        if article_id and source == "semantic" and doc_type == "article":
+                            doc.page_content = f"{self.base_retriever.wrapper.get_article(article_id)}\n\nСсылка на статью: {link}"
+                    except Exception as e:
+                        logging.warning(f"Cannot get article content. Continue with incomplete document'.\nException: {e}\nArticle: {article_id}")
+            
         except Exception as e:
             logging.error(f"Error occured at 'TeamlyContextualCompressionRetriever::_get_relevant_documents'.\nException: {e}")
             raise e

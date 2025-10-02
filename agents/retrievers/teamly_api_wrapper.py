@@ -302,7 +302,7 @@ class TeamlyAPIWrapper(BaseModel, ABC):
             resp = requests.post(f"{self.base_url}{url}", json=payload, headers=self._headers())
             resp.raise_for_status()
         except Exception as e:
-            logging.error(f"Non-critical exception occured at 'TeamlyAPIWrapper::_post'.\nException: {e}\nResponse: {resp}")
+            logging.error(f"Non-critical exception occured at 'TeamlyAPIWrapper::_post'.\nException: {e}\nResponse: {resp}\nURL:{url}\nPayload: {payload}")
             raise e
         return resp.json()
 
