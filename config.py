@@ -14,7 +14,7 @@ CHROME_DRIVER_PATH = './bin/chromedriver.exe'
 LOGIN_URL = 'https://kb.ileasing.ru/auth/sign-in?redirect=%2Fspace%2Fa100dc8d-3af0-418c-8634-f09f1fdb06f2%2Farticle%2Fa1038bbc-e5d9-4b5a-9482-2739c19cb6cb'
 TARGET_URL = 'https://kb.ileasing.ru/space/a100dc8d-3af0-418c-8634-f09f1fdb06f2/article/a1038bbc-e5d9-4b5a-9482-2739c19cb6cb'
 USERNAME = '7810155'
-PASSWORD = os.environ.get('IL_PWD') 
+PASSWORD = os.environ.get('IL_PWD', "NOTINUSE") 
 
 LOCAL_MODEL_NAME='/models/Meta-Llama-3.1-8B-Instruct-Q8_0'
 
