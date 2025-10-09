@@ -348,19 +348,19 @@ class TeamlyAPIWrapper(BaseModel, ABC):
         )
 
     def _get_token(self) -> str:
+        max_attempts = 3
         attempt = 0
-        while True:
+        while attempt in range(max_attempts):
             try:
                 return self._refresh_token()
-            except requests.HTTPError:
+            except requests.HTTPError as refresh_error:
                 try:
                     return self._authorise()
-                except Exception as e:
-                    logging.error(f"Error occured at 'TeamlyAPIWrapper::_get_token' on attempt: {attempt}.\nException: {e}")
-                    if attempt >= 2:
-                        raise e
-                    else:
-                        attempt = attempt + 1
+                except Exception as auth_error:
+                    logging.error(f"Error occurred at 'TeamlyAPIWrapper::_get_token' on attempt: {attempt + 1}/{max_attempts}. Refresh error: {refresh_error}. Auth error: {auth_error}")
+                    attempt += 1
+                    if attempt >= max_attempts:
+                        raise auth_error
 
     # ---------------------------------------------------------------------
     # Semantic search & conversion
