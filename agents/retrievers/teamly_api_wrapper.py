@@ -184,7 +184,11 @@ class TeamlyAPIWrapper(BaseModel, ABC):
         super().__init__()
 
         self._auth_path = auth_data_store
-        with open(auth_data_store, "r", encoding="utf-8") as f:
+        self._load_auth_data()
+        self._load_sd_documents()
+
+    def _load_auth_data(self):
+        with open(self._auth_path, "r", encoding="utf-8") as f:
             self._auth_data = json.load(f)
 
         self.base_url: str = self._auth_data["base_url"].rstrip("/")
@@ -198,8 +202,6 @@ class TeamlyAPIWrapper(BaseModel, ABC):
             "Content-Type": "application/json",
             "Authorization": f"Bearer {self.auth_code}",
         }
-
-        self._load_sd_documents()
 
     @abstractmethod
     def get_documents(self, df: pd.DataFrame) -> list[Document]:
@@ -358,7 +360,11 @@ class TeamlyAPIWrapper(BaseModel, ABC):
                 try:
                     return self._authorise()
                 except Exception as auth_error:
-                    logging.error(f"Error occurred at 'TeamlyAPIWrapper::_get_token' on attempt: {attempt + 1}/{max_attempts}. Refresh error: {refresh_error}. Auth error: {auth_error}")
+                    logging.error(f"Error occurred at 'TeamlyAPIWrapper::_get_token' on attempt: {attempt + 1}/{max_attempts}.\n\t"
+                                  f"Refresh error: {refresh_error}.\n\t"
+                                  f"Auth error: {auth_error}.\n\t"
+                                  f"Client: {self.client_id}")
+                    self._load_auth_data()
                     attempt += 1
                     if attempt >= max_attempts:
                         raise auth_error
