@@ -128,6 +128,7 @@ def _get_article_text(base_url: str, article_info: Dict) -> str:
 # Main retriever
 # ---------------------------------------------------------------------------
 
+## TODO: List of articles which shall not be processed with semantic search. It shall be removed and exclusions to be implemented via user rights.
 GLOSSARY_ARTICLE_IDS=[
     "91c22083-a2cc-4928-bfad-5925b2da021f"
     , "edf2f482-f2a6-46ac-91df-1da136a5d3ef"
